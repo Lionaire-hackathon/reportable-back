@@ -13,11 +13,11 @@ dotenv.config();
   imports: [
     TypeOrmModule.forRoot({
       type: 'mysql',
-      host: 'no1-database.cnuayuowelgu.ap-northeast-2.rds.amazonaws.com',
-      port: 3306,
-      username: 'admin',
-      password: '#gulmat456',
-      database: 'no1DB',
+      host: process.env.DB_HOST,
+      port: parseInt(process.env.DB_PORT, 10),
+      username: process.env.DB_ADMIN,
+      password: process.env.DB_PASS,
+      database: process.env.DB_NAME,
       entities: [__dirname + '/**/*.entity{.ts,.js}'],
       synchronize: true, // 주의: 프로덕션에서는 false로 설정
     }),
