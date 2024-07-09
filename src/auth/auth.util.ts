@@ -7,11 +7,14 @@ export const setLoginCookie = (
   refreshToken: string,
 ) => {
   // 쿠키를 설정합니다.
+  console.log('setLoginCookie environment: ', process.env.ENV);
+  const sameSite = process.env.ENV === 'production' ? 'none' : 'strict';
+  const secure = process.env.ENV === 'production' ? true : false;
   res.cookie('refreshToken', refreshToken, {
     domain: process.env.FRONTEND_DOMAIN,
     path: '/',
-    sameSite: 'none',
-    secure: false,
+    sameSite,
+    secure,
     httpOnly: true,
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
   });
@@ -19,25 +22,28 @@ export const setLoginCookie = (
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     domain: process.env.FRONTEND_DOMAIN,
     path: '/',
-    sameSite: 'none',
-    secure: false,
+    sameSite,
+    secure,
     httpOnly: false,
   });
 };
 
 export const setLogoutCookie = (res: Response) => {
+    console.log('setLogoutCookie environment: ', process.env.ENV);
+    const sameSite = process.env.ENV === 'production' ? 'none' : 'strict';
+    const secure = process.env.ENV === 'production' ? true : false;
     res.clearCookie('refreshToken', {
         domain: process.env.FRONTEND_DOMAIN,
         path: '/',
-        sameSite: 'none',
-        secure: true,
+        sameSite,
+        secure,
         httpOnly: true,
     });
     res.clearCookie('accessToken', {
         domain: process.env.FRONTEND_DOMAIN,
         path: '/',
-        sameSite: 'none',
-        secure: true,
+        sameSite,
+        secure,
         httpOnly: false,
     });
     res.sendStatus(200);
