@@ -20,8 +20,8 @@ async function bootstrap() {
 
   // Swagger를 설정합니다.
   const config = new DocumentBuilder()
-    .setTitle('No_1 API')
-    .setDescription('The No_1 API description')
+    .setTitle('REPORTABLE API')
+    .setDescription('The reportable API description')
     .setVersion('1.0')
     .addBearerAuth(
       {
