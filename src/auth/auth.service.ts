@@ -97,6 +97,7 @@ export class AuthService {
       sub: identity.user.id,
       role: identity.user.role,
     };
+    console.log(payload)
 
     // 토큰을 생성합니다.
     const accessToken = this.jwtService.sign(payload, { expiresIn: '30m' });
