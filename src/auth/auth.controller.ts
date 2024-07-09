@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, HttpStatus, Post, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SignUpDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
@@ -34,6 +34,19 @@ export class AuthController {
   @Post('refresh')
   async refresh(@Body('refreshToken') refreshToken, @Res() res) {
     return this.authService.refreshToken(res, refreshToken);
+  }
+
+  @Get('refreshToken')
+  refreshToken(@Req() req: any, @Res() res: any) {
+    try {
+      const refreshToken = req.cookies['refreshToken'];
+      if (!refreshToken) {
+        throw new HttpException('Refresh token not found in cookies', HttpStatus.BAD_REQUEST);
+      }
+      res.status(HttpStatus.OK).json({ refreshToken });
+    } catch (error) {
+      throw new HttpException('Internal server error', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 
   // 로그아웃 요청을 처리합니다.
