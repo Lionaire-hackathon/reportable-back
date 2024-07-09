@@ -6,6 +6,7 @@ import { ApiBearerAuth } from '@nestjs/swagger';
 import { setLoginCookie } from './auth.util';
 import { JwtGuard } from './guard/jwt.guard';
 import { AuthGuard } from '@nestjs/passport';
+import { LoginDto } from './dto/login.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -17,13 +18,12 @@ export class AuthController {
   async signup(@Body() signUpDto: SignUpDto, @Res() res) {
     return this.authService.signup(res, signUpDto);
   }
-  
-  // 로그인 요청을 처리합니다.
+
   @Post('login')
   async login(@Body() loginDto: LoginDto, @Res() res) {
     return this.authService.login(res, loginDto);
   }
-  
+
   @ApiBearerAuth('JWT') // ApiBearerAuth 데코레이터를 사용하여 Swagger에서 JWT를 사용한다고 명시합니다.
   @UseGuards(JwtGuard)
   @Get('verify')
@@ -50,4 +50,5 @@ export class AuthController {
       setLoginCookie(res, accessToken, refreshToken);
       res.redirect(process.env.FRONTEND_URL);
   }
+
 }

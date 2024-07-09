@@ -1,6 +1,7 @@
 import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
 import { DocumentService } from './document.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { JwtGuard } from 'src/auth/guard/jwt.guard';
 
 @Controller('document')
 export class DocumentController {
