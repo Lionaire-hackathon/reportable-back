@@ -24,3 +24,21 @@ export const setLoginCookie = (
     httpOnly: false,
   });
 };
+
+export const setLogoutCookie = (res: Response) => {
+    res.clearCookie('refreshToken', {
+        domain: process.env.FRONTEND_DOMAIN,
+        path: '/',
+        sameSite: 'none',
+        secure: true,
+        httpOnly: true,
+    });
+    res.clearCookie('accessToken', {
+        domain: process.env.FRONTEND_DOMAIN,
+        path: '/',
+        sameSite: 'none',
+        secure: true,
+        httpOnly: false,
+    });
+    res.sendStatus(200);
+}

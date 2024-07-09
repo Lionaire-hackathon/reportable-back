@@ -1,8 +1,4 @@
-import {
-  ConflictException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Identity } from './entity/identity.entity';
 import { Repository } from 'typeorm';
@@ -13,7 +9,8 @@ import * as bcrypt from 'bcrypt';
 import { Response } from 'express';
 import { SignUpDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
-import { setLoginCookie } from './auth.util';
+import { setLoginCookie, setLogoutCookie } from './auth.util';
+import { Role, User } from 'src/users/entity/user.entity';
 
 @Injectable()
 export class AuthService {
@@ -109,4 +106,97 @@ export class AuthService {
 
     res.sendStatus(200);
   }
+  
+  // 토큰 검증 요청을 처리합니다.
+  async verifyUser(userId: number): Promise<User> {
+    // 사용자의 정보를 찾아 반환합니다.
+    return this.usersService.findOneById(userId);
+}
+
+// 토큰 갱신 요청을 처리합니다.
+async refreshToken(res: Response, token: string) {
+    try {
+        // 토큰을 검증합니다.
+        const decoded = this.jwtService.verify(token);
+
+        // 사용자의 인증 정보를 찾습니다.
+        const identity = await this.identityRepository.findOne({
+            where: {
+                user: {
+                    id: decoded.sub,
+                }
+            },
+            relations: ['user'],
+        });
+
+        // 사용자의 인증 정보가 존재하지 않거나, 리프레시 토큰이 일치하지 않는다면 예외를 발생시킵니다.
+        if (!identity || identity.refreshToken !== token) {
+            throw new UnauthorizedException('Invalid token');
+        }
+
+        // 사용자의 정보를 토큰에 담습니다.
+        const payload = { email: identity.email, sub: identity.user.id, role: identity.user.role };
+        const accessToken = this.jwtService.sign(payload, { expiresIn: '30m' });
+
+        // 로그인 쿠키를 설정합니다.
+        setLoginCookie(res, accessToken, token);
+        res.sendStatus(200);
+    } catch (error) {
+        console.log(error)
+        throw new UnauthorizedException('Invalid token');
+    }
+}
+
+// 로그아웃 요청을 처리합니다.
+async logout(res: Response) {
+  setLogoutCookie(res);
+}
+
+// 구글 로그인 요청을 처리합니다.
+async validateOAuthLogin(userPayload: any, provider: string) {
+    // 사용자의 정보를 찾습니다.
+    let user: User = await this.usersService.findOne(userPayload.email);
+
+    // 사용자가 존재하지 않는다면 사용자를 생성합니다.
+    if(!user){
+        user = await this.usersService.createUser({
+            email: userPayload.email,
+            name: userPayload.name,
+            phone_number: '',
+        });
+    }
+
+    // 사용자의 정보를 토큰에 담습니다.
+    const payload = { email: user.email, sub: user.id, role: user.role };
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
+    const refreshToken = this.jwtService.sign(payload, { expiresIn: '30d' });
+
+    // 사용자의 인증 정보를 찾습니다.
+    let identity = await this.identityRepository.findOneBy({
+        email: userPayload.email,
+    });
+
+    // 사용자의 인증 정보가 존재하지 않는다면 생성합니다.
+    if (!identity) {
+        // 사용자의 인증 정보를 생성합니다.
+        identity = this.identityRepository.create({
+            email: userPayload.email,
+            provider,
+            user,
+            refreshToken,
+        });
+
+        // 사용자의 인증 정보를 저장합니다.
+        await this.identityRepository.save(identity);
+    } else {
+        if(identity.provider !== provider){
+            throw new UnauthorizedException('이미 존재하는 이메일입니다.');
+        } else{
+            await this.identityRepository.update(identity.id, { refreshToken });
+        }
+    }
+
+    // 토근을 반환합니다.
+    return { accessToken, refreshToken };
+}
 }

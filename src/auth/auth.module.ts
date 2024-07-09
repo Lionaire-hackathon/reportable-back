@@ -11,7 +11,7 @@ import { JwtModule } from '@nestjs/jwt';
   imports: [
     TypeOrmModule.forFeature([Identity, User]),
     JwtModule.register({
-      secret: 'secretKey', // 실제 환경에서는 .env 파일 등에서 관리하는 것이 좋습니다.
+      secret: process.env.JWT_SECRET, // JWT 비밀 키 설정
       signOptions: { expiresIn: '60m' }, // 토큰 만료 시간 설정
     }),
   ],
