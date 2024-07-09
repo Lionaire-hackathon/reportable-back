@@ -6,7 +6,6 @@ import { ApiBearerAuth } from '@nestjs/swagger';
 import { setLoginCookie } from './auth.util';
 import { JwtGuard } from './guard/jwt.guard';
 import { AuthGuard } from '@nestjs/passport';
-import { LoginDto } from './dto/login.dto';
 
 @Controller('auth')
 export class AuthController {
