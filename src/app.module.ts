@@ -5,6 +5,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentModule } from './document/document.module';
+import { ScriptModule } from './script/script.module';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -24,6 +25,7 @@ dotenv.config();
     AuthModule,
     UsersModule,
     DocumentModule,
+    ScriptModule,
   ],
   controllers: [AppController],
   providers: [AppService],
