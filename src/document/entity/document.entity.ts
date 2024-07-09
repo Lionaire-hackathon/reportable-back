@@ -45,7 +45,7 @@ export class Document {
   @Column()
   url: string;
 
-  @Column()
+  @Column({ default: 0 }) // default value 0 token으로 설정
   used_tokens: number;
 
   @CreateDateColumn()
