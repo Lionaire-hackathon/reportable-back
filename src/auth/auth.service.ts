@@ -8,6 +8,7 @@ import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 import { Response } from 'express';
 import { SignUpDto } from './dto/signup.dto';
+import { LoginDto } from './dto/login.dto';
 import { setLoginCookie, setLogoutCookie } from './auth.util';
 import { Role, User } from 'src/users/entity/user.entity';
 import { LoginDto } from './dto/login.dto';
@@ -56,6 +57,57 @@ export class AuthService {
     res.sendStatus(200);
   }
 
+  // 로그인 요청을 처리합니다.
+  async login(res: Response, loginDto: LoginDto) {
+    // 이메일로 사용자의 인증 정보를 찾습니다.
+    const identity = await this.identityRepository.findOne({
+      where: { email: loginDto.email },
+      relations: ['user'],
+    });
+
+    // 이메일이 존재하지 않는다면 예외를 발생시킵니다.
+    if (!identity) {
+      throw new UnauthorizedException('이메일이 존재하지 않습니다.');
+    }
+
+    // 이메일 제공자를 통한 로그인만 가능합니다.
+    if (identity.provider !== 'email') {
+      throw new UnauthorizedException(
+        '이메일 제공자를 통한 로그인만 가능합니다.',
+      );
+    }
+
+    // 비밀번호가 일치하는지 확인합니다.
+    const isPasswordValid = await bcrypt.compare(
+      loginDto.password,
+      identity.password,
+    );
+
+    // 비밀번호가 일치하지 않는다면 예외를 발생시킵니다.
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('비밀번호가 일치하지 않습니다.');
+    }
+
+    // 사용자의 정보를 토큰에 담습니다.
+    const payload = {
+      email: identity.email,
+      sub: identity.user.id,
+      role: identity.user.role,
+    };
+
+    // 토큰을 생성합니다.
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '30m' });
+    const refreshToken = this.jwtService.sign(payload, { expiresIn: '30d' });
+
+    // 사용자의 인증 정보를 업데이트합니다.
+    await this.identityRepository.update(identity.id, { refreshToken });
+
+    // 로그인 쿠키를 설정합니다.
+    setLoginCookie(res, accessToken, refreshToken);
+
+    res.sendStatus(200);
+  }
+  
   // 토큰 검증 요청을 처리합니다.
   async verifyUser(userId: number): Promise<User> {
     // 사용자의 정보를 찾아 반환합니다.
