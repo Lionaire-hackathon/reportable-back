@@ -70,12 +70,14 @@ export class AuthService {
 
     // 이메일이 존재하지 않는다면 예외를 발생시킵니다.
     if (!identity) {
-      throw new UnauthorizedException('이메일이 존재하지 않습니다.');
+      console.log('가입된 이메일이 아닙니다.');
+      throw new ConflictException('가입된 이메일이 아닙니다.');
     }
 
     // 이메일 제공자를 통한 로그인만 가능합니다.
     if (identity.provider !== 'email') {
-      throw new UnauthorizedException(
+      console.log('이메일 제공자를 통한 로그인만 가능합니다.');
+      throw new ConflictException(
         '이메일 제공자를 통한 로그인만 가능합니다.',
       );
     }
@@ -88,7 +90,8 @@ export class AuthService {
 
     // 비밀번호가 일치하지 않는다면 예외를 발생시킵니다.
     if (!isPasswordValid) {
-      throw new UnauthorizedException('비밀번호가 일치하지 않습니다.');
+      console.log('비밀번호가 일치하지 않습니다.');
+      throw new ConflictException('비밀번호가 일치하지 않습니다.');
     }
 
     // 사용자의 정보를 토큰에 담습니다.

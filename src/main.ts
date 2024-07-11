@@ -1,7 +1,8 @@
 import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as dotenv from 'dotenv';
+import { AllExceptionsFilter } from 'all-exceptions.filter';
+import { AppModule } from './app.module';
 
 // dotenv를 사용하여 .env 파일을 읽어옵니다.
 dotenv.config();
@@ -10,6 +11,8 @@ dotenv.config();
 async function bootstrap() {
   // AppModule을 사용하여 애플리케이션을 생성합니다.
   const app = await NestFactory.create(AppModule);
+
+  app.useGlobalFilters(new AllExceptionsFilter());
 
   // CORS를 활성화합니다.
   app.enableCors({
