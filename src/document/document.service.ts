@@ -86,33 +86,57 @@ export class DocumentService {
     if (!document) {
       throw new Error('Document not found');
     }
+    let promptHistory: object[] = [];
+    let totalInputTokenCount: number = 0;
+    let totalOutputTokenCount: number = 0;
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const prompt = await this.prompt(document);
-
+    const prompt = await this.genPromptFromDoc(document);
+    promptHistory.push({"role": "user", "content": prompt});
     //prompt 적용하기
     //const response = await this.claudeApiCall(anthropic, document, prompt);
-    const response = await this.claudeApiCall(anthropic, document, 'say 1');
+    const response = await this.claudeApiCall(anthropic, document, prompt);
+    totalInputTokenCount += response.usage['input_tokens'];
+    totalOutputTokenCount += response.usage['output_tokens'];
+    promptHistory.push({"role": "assistant", "content": response.content[0]['text']});
+    if (response.stop_reason === "end_turn") {
+      const textOutput = response.content[0]['text'];
+    } else {
+      const response = await this.claudeApiCallWithPromptHistory(anthropic, document, promptHistory);
+      totalInputTokenCount += response.usage['input_tokens'];
+      totalOutputTokenCount += response.usage['output_tokens'];
+      const textOutput = promptHistory[1]['content']+response.content[0]['text'];
+    }
     const s3Url = await this.uploadContentToS3(
-      response.content[0]['text'],
+      textOutput,
       document.title,
     );
-
+    document.used_input_tokens = totalInputTokenCount;
+    document.used_output_tokens = totalOutputTokenCount;
     document.url = s3Url;
-
     return this.documentRepository.save(document);
   }
 
-  async claudeApiCall(anthropic: Anthropic, document: Document, prompt: string) {
+  async claudeApiCallWithPromptHistory(anthropic: Anthropic, document: Document, promptHistory: object[]): Promise<any> {
     const response = await anthropic.messages.create({
       model: 'claude-3-5-sonnet-20240620',
       max_tokens: 512,
-      messages: [{ role: 'user', content: prompt }],
+      messages: [{"role": "user", "content": promptHistory[0]['content']},
+                 {"role": "assistant", "content": promptHistory[1]['content']},
+                 {"role": "user", "content": "Continue."},],
+    });
+    return response;
+  }
+
+  async claudeApiCall(anthropic: Anthropic, document: Document, prompt: string): Promise<any> {
+    const response = await anthropic.messages.create({
+      model: 'claude-3-5-sonnet-20240620',
+      max_tokens: 512,
+      messages: [{"role": "user", "content": prompt}],
     });
     console.log(response.content[0]['text']);
-    return JSON.parse(response.content[0]['text']);
+    return response;
   }
   
-
   async uploadContentToS3(content: string, title: string): Promise<string> {
     const fileName = `${title}-${uuidv4()}.txt`; // 파일 이름 설정
     const filePath = path.join('documents', fileName); // 파일 경로 설정
@@ -224,7 +248,7 @@ export class DocumentService {
     }
   }
 
-  async prompt(document: Document): Promise<string> {
+  async genPromptFromDoc(document: Document): Promise<string> {
     const { type, title, prompt, amount, form, elements, core, files } =
       document;
 
