@@ -7,11 +7,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentModule } from './document/document.module';
 import { FileModule } from './file/file.module';
 import * as dotenv from 'dotenv';
+import { ConfigModule } from '@nestjs/config';
 
 dotenv.config();
 
 @Module({
   imports: [
+    ConfigModule.forRoot({ isGlobal: true }),
     TypeOrmModule.forRoot({
       type: 'mysql',
       host: process.env.DB_HOST,
