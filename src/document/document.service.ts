@@ -81,7 +81,7 @@ export class DocumentService {
   }
 
   async uploadContentToS3(content: string, title: string): Promise<string> {
-    const fileName = `${uuidv4()}.txt`; // 고유한 파일 이름 생성
+    const fileName = `${title}-${uuidv4()}.txt`; // 파일 이름 설정
     const filePath = path.join('documents', fileName); // 파일 경로 설정
 
     const params = {
