@@ -10,6 +10,7 @@ import * as path from 'path';
 import Anthropic from '@anthropic-ai/sdk';
 import { EditDocumentDto } from './dto/edit-document.dto';
 import * as url from 'url';
+import { File } from 'src/file/entity/file.entity';
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY,
@@ -79,17 +80,19 @@ export class DocumentService {
   }
 
   async claudeApiCall(anthropic: Anthropic, document: Document) {
+    const prompt = await this.prompt(document);
     const response = await anthropic.messages.create({
       model: 'claude-3-5-sonnet-20240620',
       max_tokens: 512,
-      messages: [{ role: 'user', content: 'Say 1' }],
+      //prompt 준비되면 사용하기
+      messages: [{ role: 'user', content: 'say 1'}],
     });
     console.log(response.content[0]['text']);
     return response;
   }
 
   async uploadContentToS3(content: string, title: string): Promise<string> {
-    const fileName = `${uuidv4()}.txt`; // 고유한 파일 이름 생성
+    const fileName = `${title}-${uuidv4()}.txt`; // 파일 이름 설정
     const filePath = path.join('documents', fileName); // 파일 경로 설정
 
     const params = {
@@ -108,6 +111,7 @@ export class DocumentService {
     }
   }
 
+
   async edit(editDocumentDto: EditDocumentDto) {
     const { document_id, prompt, content_before } = editDocumentDto;
 
@@ -119,8 +123,6 @@ export class DocumentService {
     });
     const url_document = document.url;
     const documentContent = await this.downloadContentFromS3(url_document);
-    console.log('total document ', documentContent);
-    console.log('before_content ', content_before);
 
     //claude API edit call
     // 사용자 프롬프트를 통해 Claude API에 수정 요청을 보내고 이를 반영하여 document 수정
@@ -134,8 +136,6 @@ export class DocumentService {
       content_before,
       content_after,
     );
-
-    console.log('updated content', updatedContent);
 
     // edit content 저장
     const s3Url = await this.updateContentToS3(updatedContent, url_document);
@@ -162,12 +162,11 @@ export class DocumentService {
   }
 
   async downloadContentFromS3(url: string): Promise<string> {
-    // URL을 분석합니다.
+    // URL을 분석
     const parsedUrl = new URL(url);
 
-    // pathname에서 첫 번째 슬래시를 제거하고 디코딩하여 키를 얻습니다.
+    // pathname에서 첫 번째 슬래시를 제거하고 디코딩하여 키를 얻기
     const key = decodeURIComponent(parsedUrl.pathname.substring(1));
-    console.log('converted key: ', key);
 
     const params = {
       Bucket: process.env.AWS_BUCKET_NAME,
@@ -187,8 +186,6 @@ export class DocumentService {
     const parsedUrl = new URL(url);
     const key = decodeURIComponent(parsedUrl.pathname.substring(1));
 
-    console.log('update_key:', key);
-
     const params = {
       Bucket: process.env.AWS_BUCKET_NAME, // S3 버킷 이름
       Key: key, // 파일 경로
@@ -201,7 +198,92 @@ export class DocumentService {
       return data.Location; // 업로드된 파일의 URL 반환
     } catch (error) {
       console.error('Error uploading file to S3:', error);
-      throw new Error('Error uploading file to S3');
+      throw new Error('Error uploading file to S3'); 
+    }
+  }
+
+  async prompt(document: Document): Promise<string> {
+    const { type, title, prompt, amount, form, elements, core, files } =
+      document;
+
+    const formatFiles = (files: File[]): string => {
+      return files
+        .map(
+          (file) => `
+    파일명: ${file.name}
+    내용: ${file.description}
+    ---------`,
+        )
+        .join('\n');
+    };
+
+    if (type === 'essay') {
+      return `
+      당신은 보고서를 작성해야 하는 대학생입니다.
+      <지시문>
+      아래 제시한 조건과 요청사항에 따라 보고서를 작성해주세요.
+      </지시문>
+      
+      <조건>
+      1. 분량은 반드시 ${amount}자 이내로 작성해야 합니다.
+      2. 양식 : ${form}
+      3. 보고서는 html로 작성되어야 합니다.
+      4. 필요하다면 인터넷 검색 결과를 바탕으로 보고서를 작성해야 합니다.
+      5. 인터넷 검색 결과를 사용할 경우 마지막에 "참고문헌" 차례에 구체적인 참고문헌 url 링크를 첨부해야 합니다.
+      6. 보고서는 명확한 어휘와 전문용어를 사용해서 작성해야 합니다.
+      7. 아래 보고서 주제에 따라 작성하세요.
+      8. 보고서의 서식은 대제목-중제목-소제목-본문으로 구성되어야 합니다. 대제목과 중제목은 볼드체를 사용하고 대제목은 항상 중앙 정렬되어야 합니다. 본문은 축약형이 아닌 서술형의 형태로 작성되어야 합니다.
+      
+      </조건>
+      
+      <요청사항>
+      ${prompt}
+      </요청사항>
+      
+      <보고서 주제>
+      ${title}
+      </보고서 주제>
+      `;
+    } else if (type === 'research') {
+      return `
+      당신은 실험보고서를 작성해야 하는 대학생입니다.
+      <지시문>
+      아래 제시한 조건과 요청사항에 따라 실험보고서를 작성해주세요.
+      </지시문>
+
+      <조건>
+      1. 분량은 반드시 ${amount}자 이내로 작성해야 합니다.
+      2. 실험보고서에는 아래와 같은 내용이 포함되어야 합니다
+	    <목차>
+	      ${elements}
+	    </목차>
+      3. 보고서는 html로 작성되어야 합니다.
+      4. 필요하다면 인터넷 검색 결과를 바탕으로 보고서를 작성해야 합니다.
+      5. 인터넷 검색 결과를 사용할 경우 마지막에 "참고문헌" 차례에 구체적인 참고문헌 url 링크를 첨부해야 합니다.
+      6. 보고서는 명확한 어휘를 사용해서 작성해야 합니다.
+      7. 아래 제시된 보고서의 핵심내용을 반드시 반영해야 합니다.
+      8. 첨부된 이미지나 도표를 적절한 위치에 인용해야 합니다.
+      9. 실험보고서 주제에 따라 작성해야 합니다
+      </조건>
+
+      <첨부파일>
+      첨부파일을 사용할 때에는 본문 속에 <<파일명>>과 같이 작성해야 합니다. 아래는 사용가능한 파일 리스트와 파일의 내용들입니다.
+
+      ${files? formatFiles(files) : '첨부파일이 없습니다.'}
+
+      </첨부파일>
+
+      <요청사항>
+      ${prompt}
+      </요청사항>
+
+      <핵심내용>
+      ${core}
+      </핵심내용>
+
+      <보고서 주제>
+      ${title}
+      </보고서 주제>`;
     }
   }
 }
