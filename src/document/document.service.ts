@@ -7,6 +7,7 @@ import { CreateDocumentDto } from './dto/create-document.dto';
 import * as AWS from 'aws-sdk';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
+import Anthropic from '@anthropic-ai/sdk';
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY,
@@ -58,20 +59,25 @@ export class DocumentService {
     if (!document) {
       throw new Error('Document not found');
     }
-
-    const content = await this.claudeApiCall(document);
-
-    const s3Url = await this.uploadContentToS3(content, document.title);
+    const anthropic = new Anthropic({apiKey: process.env.ANTHROPIC_API_KEY});
+    const response = await this.claudeApiCall(anthropic, document);
+    const s3Url = await this.uploadContentToS3(response.content[0]["text"], document.title);
     
     document.url = s3Url;
-
 
     return this.documentRepository.save(document);
   }
 
-  async claudeApiCall(document: Document): Promise<string> {
-    // Claude API 호출
-    return 'claude api content';
+  async claudeApiCall(anthropic: Anthropic, document: Document) {
+    const response = await anthropic.messages.create({
+      model: "claude-3-5-sonnet-20240620",
+      max_tokens: 512,
+      messages: [
+        {"role": "user", "content": "Say 1"}
+      ]
+    });
+    console.log(response.content[0]["text"]);
+    return response;
   }
 
   async uploadContentToS3(content: string, title: string): Promise<string> {
@@ -79,7 +85,7 @@ export class DocumentService {
     const filePath = path.join('documents', fileName); // 파일 경로 설정
 
     const params = {
-      Bucket: process.env.AWS_S3_BUCKET_NAME, // S3 버킷 이름
+      Bucket: process.env.AWS_BUCKET_NAME, // S3 버킷 이름
       Key: filePath, // 파일 경로
       Body: content, // 파일 내용
       ContentType: 'text/plain', // 파일 타입
