@@ -32,7 +32,12 @@ export class DocumentController {
   createContent(@Body() createDocumentContentsDto: CreateDocumentContentsDto) {
     return this.documentService.createContent(createDocumentContentsDto.documentId);
   }
-
+  
+  @Post('first-prompt')
+  @ApiBody({type: CreateDocumentContentsDto})
+  firstPrompt(@Body() createDocumentContentsDto: CreateDocumentContentsDto) {
+    return this.documentService.firstPrompt(createDocumentContentsDto.documentId);
+  }
   // 문서의 내용 수정하기
   @UseGuards(JwtGuard) // JwtGuard를 사용하여 JWT를 검증합니다.
   @Patch('edit')
