@@ -15,18 +15,19 @@ export class FileService {
   ) {}
 
   async create(createFileDto: CreateFileDto) {
-    const { document_id, name, url } = createFileDto;
+    const { document_id, name, description, url } = createFileDto;
 
     // Find the Document entity using the document_id
     const document = await this.documentRepository.findOne({
       where: { id: document_id },
+      relations: ['files'],
     });
     if (!document) {
       throw new NotFoundException('Document not found');
     }
 
     // Create a new File entity and set its properties
-    const file = this.fileRepository.create({ name, url, document });
+    const file = this.fileRepository.create({ name, description, url, document });
 
     // Save the File entity using the repository
     await this.fileRepository.save(file);

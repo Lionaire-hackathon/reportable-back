@@ -16,6 +16,9 @@ export class File {
   name: string;
 
   @Column()
+  description: string;
+
+  @Column()
   url: string;
 
   @ManyToOne(() => Document, (document) => document.files)

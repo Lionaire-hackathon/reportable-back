@@ -14,6 +14,12 @@ export class CreateFileDto {
   name: string;
 
   @ApiProperty({
+    example: 'The description of the file',
+    description: 'The description of the file',
+  })
+  description: string;
+
+  @ApiProperty({
     example: 'The url of the file',
     description: 'The title of the file',
   })
