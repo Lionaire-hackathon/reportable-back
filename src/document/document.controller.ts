@@ -23,4 +23,10 @@ export class DocumentController {
   createContent(@Body() createDocumentContentsDto: CreateDocumentContentsDto) {
     return this.documentService.createContent(createDocumentContentsDto.documentId);
   }
+
+  @Post('first-prompt')
+  @ApiBody({type: CreateDocumentContentsDto})
+  firstPrompt(@Body() createDocumentContentsDto: CreateDocumentContentsDto) {
+    return this.documentService.firstPrompt(createDocumentContentsDto.documentId);
+  }
 }

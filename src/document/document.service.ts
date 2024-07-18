@@ -58,6 +58,25 @@ export class DocumentService {
     return this.documentRepository.save(post);
   }
 
+  async firstPrompt(documentId: number): Promise<any> {
+    const document = await this.documentRepository.findOneBy({
+      id: documentId,
+    });
+    if (!document) {
+      throw new Error('Document not found');
+    }
+    const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const response = await this.claudeApiCall(anthropic, document, `에세이 주제 "${document.title}"에 대해 답변하기 위해서 내용과 관련해서 너가 모르는 정보나 사용자의 견해 등 추가적으로 받아야 할 정보가 있어? 있으면 {
+      needMorePrompt: 1,
+      prompt: ["질문1 내용", "질문2 내용",...]
+    }형태로 대답하고, 없으면 {
+      needMorePrompt: 0
+    }으로 대답해`);
+  
+    return response;
+  }
+  
+
   async createContent(documentId: number): Promise<Document> {
     const document = await this.documentRepository.findOneBy({
       id: documentId,
@@ -66,7 +85,11 @@ export class DocumentService {
       throw new Error('Document not found');
     }
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const response = await this.claudeApiCall(anthropic, document);
+    const prompt = await this.prompt(document);
+
+    //prompt 적용하기
+    //const response = await this.claudeApiCall(anthropic, document, prompt);
+    const response = await this.claudeApiCall(anthropic, document, 'say 1');
     const s3Url = await this.uploadContentToS3(
       response.content[0]['text'],
       document.title,
@@ -77,17 +100,16 @@ export class DocumentService {
     return this.documentRepository.save(document);
   }
 
-  async claudeApiCall(anthropic: Anthropic, document: Document) {
-    const prompt = await this.prompt(document);
+  async claudeApiCall(anthropic: Anthropic, document: Document, prompt: string) {
     const response = await anthropic.messages.create({
       model: 'claude-3-5-sonnet-20240620',
       max_tokens: 512,
-      //prompt 준비되면 사용하기
-      messages: [{ role: 'user', content: 'say 1'}],
+      messages: [{ role: 'user', content: prompt }],
     });
     console.log(response.content[0]['text']);
-    return response;
+    return JSON.parse(response.content[0]['text']);
   }
+  
 
   async uploadContentToS3(content: string, title: string): Promise<string> {
     const fileName = `${title}-${uuidv4()}.txt`; // 파일 이름 설정
