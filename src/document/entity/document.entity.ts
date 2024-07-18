@@ -1,3 +1,4 @@
+import { File } from 'src/file/entity/file.entity';
 import { Script } from 'src/script/entity/script.entity';
 import { User } from 'src/users/entity/user.entity';
 import {
@@ -59,7 +60,7 @@ export class Document {
   @JoinColumn()
   user: User;
 
-  @OneToMany(() => Script, (script) => script.document_id)
+  @OneToMany(() => File, (file) => file.document)
   @JoinColumn()
-  scripts: Script[];
+  files: File[];
 }

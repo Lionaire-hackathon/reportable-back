@@ -8,17 +8,17 @@ import {
 } from 'typeorm';
 
 @Entity()
-export class Script {
+export class File {
   @PrimaryGeneratedColumn()
   id: number;
 
   @Column()
-  page: number;
+  name: string;
 
   @Column()
-  content: string;
+  url: string;
 
-  @ManyToOne(() => Document, (document) => document.scripts)
+  @ManyToOne(() => Document, (document) => document.files)
   @JoinColumn()
-  document_id: Document;
+  document: Document;
 }
