@@ -26,7 +26,7 @@ export class DocumentService {
   ) {}
 
   // 게시글을 생성합니다.
-  async create(createDocumentDto: CreateDocumentDto, user_id: number) {
+  async create(createDocumentDto: CreateDocumentDto, user_id: number): Promise<Document> {
     const { title, amount, type, prompt, form, elements, core } =
       createDocumentDto;
 
