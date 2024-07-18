@@ -5,7 +5,11 @@ import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DocumentModule } from './document/document.module';
+import { FileModule } from './file/file.module';
+import * as dotenv from 'dotenv';
 import { ConfigModule } from '@nestjs/config';
+
+dotenv.config();
 
 @Module({
   imports: [
@@ -23,6 +27,7 @@ import { ConfigModule } from '@nestjs/config';
     AuthModule,
     UsersModule,
     DocumentModule,
+    FileModule,
   ],
   controllers: [AppController],
   providers: [AppService],

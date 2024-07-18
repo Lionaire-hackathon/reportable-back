@@ -1,3 +1,5 @@
+import { File } from 'src/file/entity/file.entity';
+import { Script } from 'src/script/entity/script.entity';
 import { User } from 'src/users/entity/user.entity';
 import {
   Column,
@@ -57,4 +59,8 @@ export class Document {
   @ManyToOne(() => User, (user) => user.documents)
   @JoinColumn()
   user: User;
+
+  @OneToMany(() => File, (file) => file.document)
+  @JoinColumn()
+  files: File[];
 }
