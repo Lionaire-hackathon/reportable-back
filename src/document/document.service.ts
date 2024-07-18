@@ -4,6 +4,13 @@ import { Document } from './entity/document.entity';
 import { Repository } from 'typeorm';
 import { User } from 'src/users/entity/user.entity';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import * as AWS from 'aws-sdk';
+
+AWS.config.update({
+  accessKeyId: process.env.REACT_APP_ACCESS_KEY_ID,
+  secretAccessKey: process.env.REACT_APP_SECRET_ACCESS_KEY,
+  region: process.env.REACT_APP_REGION,
+});
 
 @Injectable()
 export class DocumentService {
@@ -39,7 +46,22 @@ export class DocumentService {
       user,
     });
 
+    const content = this.createContent(createDocumentDto);
+
+    ///AWS 저장 로직
+    const s3_url= 'https://claude.s3.ap-northeast-2.amazonaws'
+
+    post.url = s3_url;
     // 게시글을 저장하고 반환합니다.
     return this.documentRepository.save(post);
+  }
+
+  async createContent(createDocumentDto: CreateDocumentDto) {
+    const { title, amount, type, prompt, form, elements, core } =
+      createDocumentDto;
+
+   console.log('claude api logic');
+
+   return 'claude api content';
   }
 }
