@@ -82,7 +82,8 @@ export class DocumentService {
     const response = await anthropic.messages.create({
       model: 'claude-3-5-sonnet-20240620',
       max_tokens: 512,
-      messages: [{ role: 'user', content: prompt }],
+      //prompt 준비되면 사용하기
+      messages: [{ role: 'user', content: 'say 1'}],
     });
     console.log(response.content[0]['text']);
     return response;
@@ -175,7 +176,7 @@ export class DocumentService {
       <첨부파일>
       첨부파일을 사용할 때에는 본문 속에 <<파일명>>과 같이 작성해야 합니다. 아래는 사용가능한 파일 리스트와 파일의 내용들입니다.
 
-      ${formatFiles(files)}
+      ${files? formatFiles(files) : '첨부파일이 없습니다.'}
 
       </첨부파일>
 
