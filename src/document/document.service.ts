@@ -14,6 +14,7 @@ import { ClaudeImageApiObject } from './dto/claude-api-objects.dto';
 import { MessageParam } from '@anthropic-ai/sdk/resources';
 import axios from 'axios';
 import { EditPromptDto } from './dto/edit-prompt.dto';
+import { Document as WordDocument, Packer, Paragraph, TextRun } from 'docx';
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY,
@@ -483,5 +484,47 @@ export class DocumentService {
 
     document.prompt = total_prompt;
     return this.documentRepository.save(document);
+  }
+
+  async getDocFile(documentId: number): Promise<string> {
+    const document = await this.documentRepository.findOneBy({
+      id: documentId,
+    });
+    if (!document) {
+      throw new Error('Document not found');
+    }
+    const content: string = await this.downloadContentFromS3(document.url);
+
+    const doc = new WordDocument({
+      sections: [
+        {
+          properties: {},
+          children: content.split('\n').map(line => new Paragraph(line)),
+        },
+      ],
+    });
+
+    const buffer = await Packer.toBuffer(doc);
+
+    // Upload to S3
+    const fileName = `${document.title}-${uuidv4()}.docx`;
+    const filePath = path.join('documents', fileName);
+
+    const params = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: filePath,
+      Body: buffer,
+      ContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    };
+
+    try {
+      const data = await this.s3.upload(params).promise();
+      document.wordUrl = data.Location;
+      await this.documentRepository.save(document);
+      return document.wordUrl;
+    } catch (error) {
+      console.error('Error uploading file to S3:', error);
+      throw new Error('Error uploading file to S3');
+    }
   }
 }

@@ -61,4 +61,9 @@ export class DocumentController {
   editPrompt(@Body() editPromptDto: EditPromptDto) {
     return this.documentService.editPrompt(editPromptDto);
   }
+
+  @Get('doc/:id')
+  getDocFile(@Param('id') documentId: number) {
+    return this.documentService.getDocFile(documentId);
+  }
 }
