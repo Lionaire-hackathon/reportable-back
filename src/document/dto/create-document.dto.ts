@@ -10,13 +10,13 @@ export class CreateDocumentDto {
   title: string;
 
   @ApiProperty({
-    example: 'The amount of the document',
+    example: 3000,
     description: 'The content of the document',
   })
   amount: number;
 
   @ApiProperty({
-    example: 'essay or research',
+    example: 'essay',
     description: 'The type of the post',
   })
   type: Type;

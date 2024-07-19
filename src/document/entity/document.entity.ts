@@ -22,7 +22,7 @@ export class Document {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({ length: 1000 })
   title: string;
 
   @Column()
@@ -31,19 +31,19 @@ export class Document {
   @Column()
   type: Type;
 
-  @Column()
+  @Column({ length: 1000 })
   prompt: string;
 
-  @Column()
+  @Column({ length: 1000 })
   form: string;
 
-  @Column()
+  @Column({ length: 1000 })
   elements: string;
 
-  @Column()
+  @Column({ length: 1000 })
   core: string;
 
-  @Column()
+  @Column({ length: 1000 })
   url: string;
 
   @Column({ default: 0 }) // default value 0 token으로 설정
