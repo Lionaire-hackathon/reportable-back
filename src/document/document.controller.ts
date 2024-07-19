@@ -15,6 +15,7 @@ import { JwtGuard } from 'src/auth/guard/jwt.guard';
 import { DocumentDto } from './dto/document.dto';
 import { ApiBody } from '@nestjs/swagger';
 import { EditDocumentDto } from './dto/edit-document.dto';
+import { EditPromptDto } from './dto/edit-prompt.dto';
 
 @Controller('document')
 export class DocumentController {
@@ -48,5 +49,11 @@ export class DocumentController {
   @Get('text/:id')
   getText(@Param('id') documentId: number) {
     return this.documentService.getText(documentId);
+  }
+
+  @UseGuards(JwtGuard)
+  @Put('edit-prompt')
+  editPrompt(@Body() editPromptDto: EditPromptDto) {
+    return this.documentService.editPrompt(editPromptDto);
   }
 }

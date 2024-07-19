@@ -13,6 +13,7 @@ import { classifyFiles, classifyImageType } from 'src/utils/file-utils';
 import { ClaudeImageApiObject } from './dto/claude-api-objects.dto';
 import { MessageParam } from '@anthropic-ai/sdk/resources';
 import axios from 'axios';
+import { EditPromptDto } from './dto/edit-prompt.dto';
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY,
@@ -172,7 +173,7 @@ export class DocumentService {
       messages: [{ role: 'user', content: prompt }],
     };
     console.log(prompt);
-
+    try {
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
       data,
@@ -180,6 +181,9 @@ export class DocumentService {
     );
     console.log(response.data.content[0].text);
     return response.data;
+    } catch (error) {
+      console.log(error);
+    }
   }
 
   async fetchImageData(imageFiles: File[]): Promise<ClaudeImageApiObject[]> {
@@ -409,7 +413,7 @@ export class DocumentService {
       </지시문>
       
       <조건>
-      1. 분량은 반드시 공백 포함 ${amount}자 이상으로 작성해야 합니다. (최소 11p 기준 A4 5장 분량)
+      1. 분량은 반드시 한글기준 공백 포함 ${amount}자 이상으로 작성해야 합니다. 내용은 응답 한번에 전부 작성하지 않아도 됩니다. 답변이 잘리더라도 다시 작성할 수 있습니다.
       2. 양식 : ${form}
       3. 필요하다면 인터넷 검색 결과를 바탕으로 보고서를 작성해야 합니다.
       4. 인터넷 검색 결과를 사용할 경우 마지막에 "참고문헌" 차례에 구체적인 참고문헌 url 링크를 첨부해야 합니다.
@@ -417,51 +421,6 @@ export class DocumentService {
       6. 아래 에세이 주제에 따라 작성하세요.
       7. 본문은 축약형이 아닌 줄글, 서술형의 형태로 작성되어야 합니다.
       8. 각각의 본론에 대해서 하위 항목이 2단계 이상 있으면 안됩니다.
-      < 서론 >
-      - 주제 소개 및 선정 이유
-      - 주제에 대한 최근 동향이나 이슈
-      - 본론에 나올 내용 간략히 소개
-      - 서론에서는 문제를 제기하고, 본론에서 다룰 내용을 제시합니다.
-      - 이 주제를 선정하게 된 배경, 글을 쓰는 목적, 환경에 대한 분석, 앞으로
-      다룰 내용을 안내합니다.
-      - 감상문이나 서평처럼 자료에 대한 소개가 필요한 경우 서론에서 간략히
-      써 줍니다.
-      - 조사 보고서의 경우 조사 목적, 조사 시기, 장소, 범위, 방법 등을 명확하
-      게 밝힙니다.
-      주로 쓰이는 표현
-      • 최근 사회 이슈에 대한 이야기, 관련 산업이나 업계 현황, 관련 질문을 던지는
-      것 등으로 시작
-      • 본 글에서는 ~~에 대해 ~~ 관점으로 접근하여 살펴보고자 한다
-      • 본 글에서는 ~~를 대상으로 조사하여 ~~ 방법으로 조사하여 분석하였다. 
-
-      < 본론 >
-      - 주제에 대한 연구 내용과 과정
-      - 근거있는 자료를 활용해 논리적으로 작성
-      - 내가 다루고자 하는 내용에 대한 구체적인 개념, 관련 이론, 분석한 내용,
-      시사점 과 같은 흐름으로 적고, 소제목을 달면 정리에 도움이 됩니다.
-      - 문제를 제기하는 레포트의 경우, 문제에 대한 보다 구체적인 설명, 그에
-      대한 논리적인 근거, 해결 방안의 흐름으로 제시해야 합니다.
-      - 근거는 최소한 2가지 이상 씁니다. 근거가 많을수록 레포트 전개에
-      설득력이 생깁니다.
-      - 본문의 중간중간에 적절한 사진이나 그림, 그래프, 참고자료를 넣어 주면
-      글이 지루하지 않습니다.
-      - 내용이 많은 경우 본론1, 2, 3으로 나누어 쓸 수 있습니다
-
-      < 결론 >
-      - 연구 결과 및 의의 도출
-      - 결과에 대한 나의 생각
-      - 과제를 통해 배운 점
-      결론은 본론에 대한 간결하고 명확한 요약입니다.
-      - 요약하면서 본론에 언급된 중요 내용을 한 번 더 강조해 줍니다.
-      - 요약과 함께 이 결과가 주는 시사점, 전반적인 내용에 대한 내 생각,
-        비판 등을 적어주면 좋습니다.
-      - 결론의 분량은 서론과 비슷하게 전체 분량의 10~20% 수준이면 됩니다. 
-      
-      주로 쓰이는 표현
-      • 지금까지 ~~를 ~~, ~~, ~~ 등으로 나누어 살펴보았다
-      • 그 결과 ~~가 ~~임을 발견했고, ~~의 문제점을 파악할 수 있었다
-      • ~~ 의 경우 ~~ 부분이 ~~로 인해 부족했다
-      • ~~이 필요하다, ~~을 것이다, ~기를 바란다 등
       </조건>
       
       <참고사항>
@@ -514,5 +473,18 @@ export class DocumentService {
       ${title}
       </보고서 주제>`;
     }
+  }
+
+  async editPrompt(editPromptDto: EditPromptDto): Promise<Document> {
+    const { documentId, addPrompt } = editPromptDto;
+
+    const document = await this.documentRepository.findOneBy({
+      id: documentId,
+    });
+
+    const total_prompt = `${document.prompt} 다음 사용자와 질의응답을 고려해서 작성해주세요. \n${addPrompt}`;
+
+    document.prompt = total_prompt;
+    return this.documentRepository.save(document);
   }
 }
