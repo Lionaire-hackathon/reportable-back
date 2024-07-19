@@ -43,7 +43,7 @@ export class Document {
   @Column({ length: 1000 })
   core: string;
 
-  @Column({ length: 1000 })
+  @Column({ length: 5000 })
   url: string;
 
   @Column({ default: 0 }) // default value 0 token으로 설정

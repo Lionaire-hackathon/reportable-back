@@ -18,7 +18,7 @@ export class File {
   @Column()
   description: string;
 
-  @Column({length: 1000})
+  @Column({length: 5000})
   url: string;
 
   @ManyToOne(() => Document, (document) => document.files)
