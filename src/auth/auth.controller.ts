@@ -39,6 +39,7 @@ export class AuthController {
   @Get('refreshToken')
   refreshToken(@Req() req: any, @Res() res: any) {
     try {
+      console.log('Cookies:', req.cookies);
       const refreshToken = req.cookies['refreshToken'];
       if (!refreshToken) {
         throw new HttpException('Refresh token not found in cookies', HttpStatus.BAD_REQUEST);

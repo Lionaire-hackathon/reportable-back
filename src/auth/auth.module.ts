@@ -17,8 +17,7 @@ dotenv.config();
   imports: [
     TypeOrmModule.forFeature([Identity, User]),
     JwtModule.register({
-      secret: process.env.JWT_SECRET, // JWT 비밀 키 설정
-      signOptions: { expiresIn: '60m' }, // 토큰 만료 시간 설정
+      secret: process.env.JWT_SECRET,
     }),
   ],
   providers: [AuthService, UsersService, JwtStrategy, GoogleStrategy],
