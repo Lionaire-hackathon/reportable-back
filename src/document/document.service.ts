@@ -11,6 +11,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { EditDocumentDto } from './dto/edit-document.dto';
 import * as url from 'url';
 import { File } from 'src/file/entity/file.entity';
+import { classifyFiles, classifyImageType } from 'src/utils/file-utils';
+import { ClaudeImageApiObject } from './dto/claude-api-objects.dto';
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY,
@@ -119,7 +121,7 @@ export class DocumentService {
   async claudeApiCallWithPromptHistory(anthropic: Anthropic, document: Document, promptHistory: object[]): Promise<any> {
     const response = await anthropic.messages.create({
       model: 'claude-3-5-sonnet-20240620',
-      max_tokens: 512,
+      max_tokens: 8192,
       messages: [{"role": "user", "content": promptHistory[0]['content']},
                  {"role": "assistant", "content": promptHistory[1]['content']},
                  {"role": "user", "content": "Continue."},],
@@ -130,11 +132,52 @@ export class DocumentService {
   async claudeApiCall(anthropic: Anthropic, document: Document, prompt: string): Promise<any> {
     const response = await anthropic.messages.create({
       model: 'claude-3-5-sonnet-20240620',
-      max_tokens: 512,
+      max_tokens: 8192,
       messages: [{"role": "user", "content": prompt}],
     });
     console.log(response.content[0]['text']);
     return response;
+  }
+
+  async fetchImageData(imageFiles: File[]): Promise<ClaudeImageApiObject[]> {
+    const claudeImageLists: ClaudeImageApiObject[] = [];
+
+    for (const file of imageFiles) {
+      const response = await fetch(file.url);
+      const arrayBuffer = await response.arrayBuffer();
+      const base64Image = Buffer.from(arrayBuffer).toString('base64');
+      claudeImageLists.push(new ClaudeImageApiObject(file.description, file.name, base64Image, classifyImageType(file.url)));
+    }
+    return claudeImageLists;
+  }
+
+  async fetchAndProcessTableData(urls: string[]): Promise<string[]> {
+    // URL 리스트를 받아서 각 URL의 테이블 데이터를 처리하여 반환
+    return null;
+  }
+
+  async claudeApiCallWithFiles(anthropic: Anthropic, document: Document, prompt: string): Promise<any> {
+    const { imageFiles, tableFiles } = classifyFiles(document.files);
+    //const imagePrompts = genImagePrompts(imageFiles);
+    //const tablePrompts = genTablePrompts(tableFiles);
+    
+    const images = await this.fetchImageData(imageFiles);
+    const table = await this.fetchAndProcessTableData(tableFiles);
+    let a: Anthropic.Messages.MessageParam[] = [{role: 'user', content: images.map(image => image.gen_content()).reduce((accumulator, val) => {return accumulator.concat(val)}, [])}];
+    const response = await anthropic.messages.create({
+      model: 'claude-3-5-sonnet-20240620',
+      max_tokens: 512,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+        {
+          role: 'user',
+          content: `Here is the total document content: ${content}.\nPlease edit it as follows:\n${prompt}`,
+        },
+      ],
+    });
   }
   
   async uploadContentToS3(content: string, title: string): Promise<string> {
@@ -156,7 +199,6 @@ export class DocumentService {
       throw new Error('Error uploading file to S3');
     }
   }
-
 
   async edit(editDocumentDto: EditDocumentDto) {
     const { document_id, prompt, content_before } = editDocumentDto;
