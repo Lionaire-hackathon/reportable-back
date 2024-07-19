@@ -33,7 +33,7 @@ export class UsersService {
 
   async findOne(email: string): Promise<User | undefined> {
     return this.userRepository.findOneBy({
-      email: email,
+      email: email
     });
   }
 

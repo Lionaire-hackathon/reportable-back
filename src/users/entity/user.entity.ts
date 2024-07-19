@@ -44,7 +44,7 @@ export class User {
   @JoinColumn()
   identity: Identity;
 
-  @OneToMany(() => Document, (document) => document.user)
+  @OneToMany(() => Document, (document) => document.user, { cascade: true, eager: true })
   @JoinColumn()
   documents: Document[];
 }
