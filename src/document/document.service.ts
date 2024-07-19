@@ -13,6 +13,7 @@ import * as url from 'url';
 import { File } from 'src/file/entity/file.entity';
 import { classifyFiles, classifyImageType } from 'src/utils/file-utils';
 import { ClaudeImageApiObject } from './dto/claude-api-objects.dto';
+import { EditPromptDto } from './dto/edit-prompt.dto';
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY,
@@ -70,16 +71,19 @@ export class DocumentService {
       throw new Error('Document not found');
     }
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const response = await this.claudeApiCall(anthropic, document, `에세이 주제 "${document.title}"에 대해 답변하기 위해서 내용과 관련해서 너가 모르는 정보나 사용자의 견해 등 추가적으로 받아야 할 정보가 있어? 있으면 {
+    const response = await this.claudeApiCall(
+      anthropic,
+      document,
+      `에세이 주제 "${document.title}"에 대해 답변하기 위해서 내용과 관련해서 너가 모르는 정보나 사용자의 견해 등 추가적으로 받아야 할 정보가 있어? 있으면 {
       needMorePrompt: 1,
       prompt: ["질문1 내용", "질문2 내용",...]
     }형태로 대답하고, 없으면 {
       needMorePrompt: 0
-    }으로 대답해`);
-  
+    }으로 대답해`,
+    );
+
     return response;
   }
-  
 
   async createContent(documentId: number): Promise<Document> {
     const document = await this.documentRepository.findOneBy({
@@ -93,47 +97,62 @@ export class DocumentService {
     let totalOutputTokenCount: number = 0;
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const prompt = await this.genPromptFromDoc(document);
-    promptHistory.push({"role": "user", "content": prompt});
+    promptHistory.push({ role: 'user', content: prompt });
     //prompt 적용하기
     //const response = await this.claudeApiCall(anthropic, document, prompt);
     const response = await this.claudeApiCall(anthropic, document, prompt);
     totalInputTokenCount += response.usage['input_tokens'];
     totalOutputTokenCount += response.usage['output_tokens'];
-    promptHistory.push({"role": "assistant", "content": response.content[0]['text']});
-    if (response.stop_reason === "end_turn") {
+    promptHistory.push({
+      role: 'assistant',
+      content: response.content[0]['text'],
+    });
+    if (response.stop_reason === 'end_turn') {
       const textOutput = response.content[0]['text'];
     } else {
-      const response = await this.claudeApiCallWithPromptHistory(anthropic, document, promptHistory);
+      const response = await this.claudeApiCallWithPromptHistory(
+        anthropic,
+        document,
+        promptHistory,
+      );
       totalInputTokenCount += response.usage['input_tokens'];
       totalOutputTokenCount += response.usage['output_tokens'];
-      const textOutput = promptHistory[1]['content']+response.content[0]['text'];
+      const textOutput =
+        promptHistory[1]['content'] + response.content[0]['text'];
     }
-    const s3Url = await this.uploadContentToS3(
-      textOutput,
-      document.title,
-    );
+    const s3Url = await this.uploadContentToS3(textOutput, document.title);
     document.used_input_tokens = totalInputTokenCount;
     document.used_output_tokens = totalOutputTokenCount;
     document.url = s3Url;
     return this.documentRepository.save(document);
   }
 
-  async claudeApiCallWithPromptHistory(anthropic: Anthropic, document: Document, promptHistory: object[]): Promise<any> {
+  async claudeApiCallWithPromptHistory(
+    anthropic: Anthropic,
+    document: Document,
+    promptHistory: object[],
+  ): Promise<any> {
     const response = await anthropic.messages.create({
       model: 'claude-3-5-sonnet-20240620',
       max_tokens: 8192,
-      messages: [{"role": "user", "content": promptHistory[0]['content']},
-                 {"role": "assistant", "content": promptHistory[1]['content']},
-                 {"role": "user", "content": "Continue."},],
+      messages: [
+        { role: 'user', content: promptHistory[0]['content'] },
+        { role: 'assistant', content: promptHistory[1]['content'] },
+        { role: 'user', content: 'Continue.' },
+      ],
     });
     return response;
   }
 
-  async claudeApiCall(anthropic: Anthropic, document: Document, prompt: string): Promise<any> {
+  async claudeApiCall(
+    anthropic: Anthropic,
+    document: Document,
+    prompt: string,
+  ): Promise<any> {
     const response = await anthropic.messages.create({
       model: 'claude-3-5-sonnet-20240620',
       max_tokens: 8192,
-      messages: [{"role": "user", "content": prompt}],
+      messages: [{ role: 'user', content: prompt }],
     });
     console.log(response.content[0]['text']);
     return response;
@@ -146,7 +165,14 @@ export class DocumentService {
       const response = await fetch(file.url);
       const arrayBuffer = await response.arrayBuffer();
       const base64Image = Buffer.from(arrayBuffer).toString('base64');
-      claudeImageLists.push(new ClaudeImageApiObject(file.description, file.name, base64Image, classifyImageType(file.url)));
+      claudeImageLists.push(
+        new ClaudeImageApiObject(
+          file.description,
+          file.name,
+          base64Image,
+          classifyImageType(file.url),
+        ),
+      );
     }
     return claudeImageLists;
   }
@@ -156,14 +182,27 @@ export class DocumentService {
     return null;
   }
 
-  async claudeApiCallWithFiles(anthropic: Anthropic, document: Document, prompt: string): Promise<any> {
+  async claudeApiCallWithFiles(
+    anthropic: Anthropic,
+    document: Document,
+    prompt: string,
+  ): Promise<any> {
     const { imageFiles, tableFiles } = classifyFiles(document.files);
     //const imagePrompts = genImagePrompts(imageFiles);
     //const tablePrompts = genTablePrompts(tableFiles);
-    
+
     const images = await this.fetchImageData(imageFiles);
     const table = await this.fetchAndProcessTableData(tableFiles);
-    let a: Anthropic.Messages.MessageParam[] = [{role: 'user', content: images.map(image => image.gen_content()).reduce((accumulator, val) => {return accumulator.concat(val)}, [])}];
+    let a: Anthropic.Messages.MessageParam[] = [
+      {
+        role: 'user',
+        content: images
+          .map((image) => image.gen_content())
+          .reduce((accumulator, val) => {
+            return accumulator.concat(val);
+          }, []),
+      },
+    ];
     const response = await anthropic.messages.create({
       model: 'claude-3-5-sonnet-20240620',
       max_tokens: 512,
@@ -179,7 +218,7 @@ export class DocumentService {
       ],
     });
   }
-  
+
   async uploadContentToS3(content: string, title: string): Promise<string> {
     const fileName = `${title}-${uuidv4()}.txt`; // 파일 이름 설정
     const filePath = path.join('documents', fileName); // 파일 경로 설정
@@ -286,8 +325,21 @@ export class DocumentService {
       return data.Location; // 업로드된 파일의 URL 반환
     } catch (error) {
       console.error('Error uploading file to S3:', error);
-      throw new Error('Error uploading file to S3'); 
+      throw new Error('Error uploading file to S3');
     }
+  }
+
+  async editPrompt(editPromptDto: EditPromptDto) {
+    const { document_id, add_prompt } = editPromptDto;
+
+    const document = await this.documentRepository.findOneBy({
+      id: document_id,
+    });
+
+    const total_prompt = `${document.prompt} 다음 사용자와 질의응답을 고려해서 작성해주세요. \n${add_prompt}`;
+
+    document.prompt = total_prompt;
+    return this.documentRepository.save(document);
   }
 
   async genPromptFromDoc(document: Document): Promise<string> {
@@ -357,7 +409,7 @@ export class DocumentService {
       <첨부파일>
       첨부파일을 사용할 때에는 본문 속에 <<파일명>>과 같이 작성해야 합니다. 아래는 사용가능한 파일 리스트와 파일의 내용들입니다.
 
-      ${files? formatFiles(files) : '첨부파일이 없습니다.'}
+      ${files ? formatFiles(files) : '첨부파일이 없습니다.'}
 
       </첨부파일>
 
