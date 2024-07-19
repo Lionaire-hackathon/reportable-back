@@ -103,7 +103,7 @@ export class AuthService {
     console.log(payload)
 
     // 토큰을 생성합니다.
-    const accessToken = this.jwtService.sign(payload, { expiresIn: '30m' });
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '2h' });
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '30d' });
 
     // 사용자의 인증 정보를 업데이트합니다.
