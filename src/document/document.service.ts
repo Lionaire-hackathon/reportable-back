@@ -210,7 +210,7 @@ export class DocumentService {
     // URL 리스트를 받아서 각 URL의 테이블 데이터를 처리하여 반환
     return null;
   }
-
+  
   async claudeApiCallWithFiles(
     document: Document,
     prompt: string,
@@ -221,18 +221,30 @@ export class DocumentService {
       'anthropic-version': '2023-06-01',
       'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15',
     };
-
+  
     const { imageFiles, spreadsheetFiles } = classifyFiles(document.files);
-
-    const images = await this.fetchImageData(imageFiles);
-    const tables = await this.fetchAndProcessTableData(
-      spreadsheetFiles.map((file) => file.url),
-    );
-
-    let imageMessages: MessageParam[] = images.map((image) => ({
-      role: 'user',
-      content: [
-        {
+  
+    let images = [];
+    try {
+      images = await this.fetchImageData(imageFiles);
+    } catch (error) {
+      console.error('Error fetching image data:', error);
+    }
+  
+    let tables = [];
+    try {
+      tables = await this.fetchAndProcessTableData(
+        spreadsheetFiles.map((file) => file.url),
+      );
+    } catch (error) {
+      console.error('Error fetching table data:', error);
+    }
+  
+    let combinedContent: Array<any> = []; // Start with the prompt
+  
+    try {
+      images.forEach((image) => {
+        combinedContent.push({
           type: 'image',
           source: {
             type: 'base64',
@@ -243,13 +255,15 @@ export class DocumentService {
               | 'image/webp',
             data: image.data,
           },
-        },
-        {
+        });
+        combinedContent.push({
           type: 'text',
           text: `이미지 이름: ${image.name}\n이미지 설명: ${image.description}`,
-        }
-      ],
-    }));
+        });
+      });
+    } catch (error) {
+      console.error('Error processing image messages:', error);
+    }
 
     const data = {
       model: 'claude-3-5-sonnet-20240620',
@@ -258,18 +272,31 @@ export class DocumentService {
         ...imageMessages,
         {
           role: 'user',
-          content: prompt,
+          content: [
+            ...combinedContent,
+            {
+              type: 'text',
+              text: prompt,
+            }
+          ]
         },
       ],
     };
-
-    const response = await axios.post(
-      'https://api.anthropic.com/v1/messages',
-      data,
-      { headers },
-    );
-    return response.data;
+  
+    try {
+      const response = await axios.post(
+        'https://api.anthropic.com/v1/messages',
+        data,
+        { headers },
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Error during Claude API call:', error);
+      throw new Error('Failed to complete Claude API call');
+    }
   }
+  
+  
 
   async uploadContentToS3(content: string, title: string): Promise<string> {
     const fileName = `${title}-${uuidv4()}.txt`;

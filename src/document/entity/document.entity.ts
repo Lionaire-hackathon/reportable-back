@@ -65,7 +65,7 @@ export class Document {
   @JoinColumn()
   user: User;
 
-  @OneToMany(() => File, (file) => file.document)
+  @OneToMany(() => File, (file) => file.document, { cascade: true , eager: true})
   @JoinColumn()
   files: File[];
 }
