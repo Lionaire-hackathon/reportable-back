@@ -244,6 +244,10 @@ export class DocumentService {
             data: image.data,
           },
         },
+        {
+          type: 'text',
+          text: `이미지 이름: ${image.name}\n이미지 설명: ${image.description}`,
+        }
       ],
     }));
 
@@ -251,11 +255,11 @@ export class DocumentService {
       model: 'claude-3-5-sonnet-20240620',
       max_tokens: 8192,
       messages: [
+        ...imageMessages,
         {
           role: 'user',
           content: prompt,
         },
-        ...imageMessages,
       ],
     };
 
@@ -397,7 +401,6 @@ export class DocumentService {
         .map(
           (file) => `
     파일명: ${file.name}
-    내용: ${file.description}
     ---------`,
         )
         .join('\n');
