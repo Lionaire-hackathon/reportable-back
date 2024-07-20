@@ -264,11 +264,12 @@ export class DocumentService {
     } catch (error) {
       console.error('Error processing image messages:', error);
     }
-  
+
     const data = {
       model: 'claude-3-5-sonnet-20240620',
       max_tokens: 8192,
       messages: [
+        ...imageMessages,
         {
           role: 'user',
           content: [
