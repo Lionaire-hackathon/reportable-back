@@ -64,7 +64,7 @@ export class DocumentController {
   }
   
   @ApiBearerAuth('JWT')
-  //@UseGuards(JwtGuard) // JwtGuard를 사용하여 JWT를 검증합니다.
+  @UseGuards(JwtGuard) // JwtGuard를 사용하여 JWT를 검증합니다.
   @Get('text/:id')
   getText(@Param('id') documentId: number) {
     return this.documentService.getText(documentId);

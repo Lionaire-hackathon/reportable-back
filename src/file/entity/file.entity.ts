@@ -21,7 +21,7 @@ export class File {
   @Column({length: 5000})
   url: string;
 
-  @ManyToOne(() => Document, (document) => document.files)
+  @ManyToOne(() => Document, (document) => document.files, { onDelete: 'CASCADE' })
   @JoinColumn()
   document: Document;
 }
