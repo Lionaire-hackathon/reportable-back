@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -28,13 +29,19 @@ export class DocumentController {
   findOne(@Param('id') documentId: number) {
     return this.documentService.findOne(documentId);
   }
-
   // 새로운 문서를 생성합니다.
   @ApiBearerAuth('JWT')
   @UseGuards(JwtGuard) // JwtGuard를 사용하여 JWT를 검증합니다.
   @Post()
   create(@Body() createDocumentDto: CreateDocumentDto, @Req() req) {
     return this.documentService.create(createDocumentDto, req.user.userId);
+  }
+
+  @ApiBearerAuth('JWT')
+  @UseGuards(JwtGuard)
+  @Delete(':id')
+  deleteDocument(@Param('id') documentId: number) {
+    return this.documentService.deleteDocument(documentId);
   }
   // 문서의 내용을 생성합니다.
   @ApiBearerAuth('JWT')

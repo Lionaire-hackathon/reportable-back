@@ -80,6 +80,18 @@ export class DocumentService {
     return this.documentRepository.save(post);
   }
 
+  async deleteDocument(documentId: number): Promise<Document> {
+    const document = await this.documentRepository.findOneBy({
+      id: documentId,
+    });
+
+    if (!document) {
+      throw new Error('Document not found');
+    }
+
+    return this.documentRepository.remove(document);
+  }
+
   async firstPrompt(documentId: number): Promise<any> {
     const document = await this.documentRepository.findOneBy({
       id: documentId,
