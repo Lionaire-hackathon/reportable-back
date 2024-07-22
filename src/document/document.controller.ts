@@ -24,7 +24,7 @@ export class DocumentController {
 
   @ApiBearerAuth('JWT')
   @UseGuards(JwtGuard)
-  @Get()
+  @Get('/:id')
   findOne(@Param('id') documentId: number) {
     return this.documentService.findOne(documentId);
   }
