@@ -21,6 +21,14 @@ import { EditPromptDto } from './dto/edit-prompt.dto';
 export class DocumentController {
   constructor(private readonly documentService: DocumentService) {}
 
+
+  @ApiBearerAuth('JWT')
+  @UseGuards(JwtGuard)
+  @Get()
+  findOne(@Param('id') documentId: number) {
+    return this.documentService.findOne(documentId);
+  }
+
   // 새로운 문서를 생성합니다.
   @ApiBearerAuth('JWT')
   @UseGuards(JwtGuard) // JwtGuard를 사용하여 JWT를 검증합니다.
@@ -30,7 +38,7 @@ export class DocumentController {
   }
   // 문서의 내용을 생성합니다.
   @ApiBearerAuth('JWT')
-  @UseGuards(JwtGuard) // JwtGuard를 사용하여 JWT를 검증합니다.
+  //@UseGuards(JwtGuard) // JwtGuard를 사용하여 JWT를 검증합니다.
   @Put('content/:id')
   createContent(@Param('id') documentId: number) {
     return this.documentService.createContent(documentId);
@@ -49,7 +57,7 @@ export class DocumentController {
   }
   
   @ApiBearerAuth('JWT')
-  @UseGuards(JwtGuard) // JwtGuard를 사용하여 JWT를 검증합니다.
+  //@UseGuards(JwtGuard) // JwtGuard를 사용하여 JWT를 검증합니다.
   @Get('text/:id')
   getText(@Param('id') documentId: number) {
     return this.documentService.getText(documentId);
