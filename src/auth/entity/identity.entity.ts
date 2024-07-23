@@ -31,7 +31,7 @@ export class Identity {
   @Column()
   is_phone_verified: Boolean;
 
-  @OneToOne(() => User) // User 엔터티와 일대일 관계를 설정합니다.
+  @OneToOne(() => User, { cascade: true, onDelete: 'CASCADE' })
   @JoinColumn()
   user: User;
 }

@@ -46,6 +46,7 @@ export class User {
 
   @OneToMany(() => Document, (document) => document.user, {
     cascade: true,
+    onDelete: 'CASCADE',
     eager: true,
   })
   @JoinColumn()
