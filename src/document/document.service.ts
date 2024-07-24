@@ -34,6 +34,11 @@ interface ChatCompletionMessageParam {
   content: string;
 }
 
+interface PromptHistory {
+  role: string;
+  content: string;
+}
+
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY,
   secretAccessKey: process.env.AWS_SECRET_KEY,
@@ -127,10 +132,12 @@ export class DocumentService {
     if (!document) {
       throw new Error('Document not found');
     }
-    let promptHistory: object[] = [];
+    let promptHistory: PromptHistory[] = [];
     let totalInputTokenCount: number = 0;
     let totalOutputTokenCount: number = 0;
     const prompt = await this.genPromptFromDoc(document);
+    console.log(prompt);
+
     promptHistory.push({ role: 'user', content: prompt });
     const response: ClaudeApiResponse =
       document.type === 'essay'
@@ -146,6 +153,9 @@ export class DocumentService {
     if (response.stop_reason === 'end_turn') {
       textOutput = response.content[0].text;
     } else {
+      console.log("response", response);
+      console.log("response stop reason", response.stop_reason);
+      console.log("prompt history", promptHistory);
       console.log('@@@Continuing the conversation...');
       const continuedResponse: ClaudeApiResponse =
         await this.claudeApiCallWithPromptHistory(document, promptHistory);
@@ -163,7 +173,7 @@ export class DocumentService {
 
   async claudeApiCallWithPromptHistory(
     document: Document,
-    promptHistory: object[],
+    promptHistory: PromptHistory[],
   ): Promise<ClaudeApiResponse> {
     const headers = {
       'x-api-key': process.env.ANTHROPIC_API_KEY,
@@ -176,17 +186,23 @@ export class DocumentService {
       model: 'claude-3-5-sonnet-20240620',
       max_tokens: 8192,
       messages: [
-        { role: 'assistant', content: [promptHistory[0]['content'], promptHistory[1]['content']] },
-        { role: 'user', content: 'Continue.' },
+        ...promptHistory,
+        {
+          role: 'user',
+          content: "Continue"
+        },
       ],
     };
-
+    try{
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
       data,
       { headers },
     );
     return response.data;
+    } catch (error) {
+      console.log("claude api call with prompt history", error);
+    }
   }
 
   async claudeApiCall(
@@ -293,7 +309,7 @@ export class DocumentService {
         });
         combinedContent.push({
           type: 'text',
-          text: `이미지 이름: ${image.name ? image.name : "없음"}\n이미지 설명: ${image.description ? image.description  : "없음"} 이미지ID: ${image.id} 이미지 type: ${image.type}`,
+          text: `이미지 이름: ${image.name ? image.name : '없음'}\n이미지 설명: ${image.description ? image.description : '없음'} 이미지ID: ${image.id} 이미지 type: ${image.type}`,
         });
       });
     } catch (error) {
@@ -401,7 +417,7 @@ export class DocumentService {
       });
 
       const response = completion.choices[0].message.content.trim();
-      console.log("response: ", response);
+      console.log('response: ', response);
       if (!response) {
         throw new Error('GPT API response is empty');
       }
@@ -428,21 +444,20 @@ export class DocumentService {
     const { type, title, prompt, amount, form, elements, core, files } =
       document;
 
-      const formatFiles = (files: File[]): string => {
-        return files
-          .filter(file => file.type === "attachment")
-          .map(
-            (file) => `
+    const formatFiles = (files: File[]): string => {
+      return files
+        .filter((file) => file.type === 'attachment')
+        .map(
+          (file) => `
       파일명: ${file.name}
       파일ID: ${file.id}
       파일 설명: ${file.description}
       파일 타입: ${file.type}
       ---------
             `,
-          )
-          .join('\n');
-      };
-      
+        )
+        .join('\n');
+    };
 
     if (type === 'essay') {
       return `
