@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class EditDocumentDto {
   @ApiProperty({
-    example: 'The url of document in s3',
+    example: 1,
     description: 'The url of document in s3',
   })
   document_id: number;
