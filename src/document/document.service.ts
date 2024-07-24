@@ -326,14 +326,14 @@ export class DocumentService {
     const shortFileName = title.substring(0, 10).replace(/\s/g, '-'); // 20글자로 제한
     const fileName = `${shortFileName}-${uuidv4()}.txt`;
     const filePath = path.join('documents', fileName);
-  
+
     const params = {
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: filePath,
       Body: content,
       ContentType: 'text/plain',
     };
-  
+
     try {
       const data = await this.s3.upload(params).promise();
       return data.Location;
@@ -342,7 +342,7 @@ export class DocumentService {
       throw new Error('Error uploading file to S3');
     }
   }
-  
+
   async edit(editDocumentDto: EditDocumentDto) {
     const { document_id, prompt, content_before } = editDocumentDto;
 
@@ -431,12 +431,13 @@ export class DocumentService {
       <조건>
       1. 분량은 반드시 한글기준 공백 포함 ${amount}자 이상으로 작성해야 합니다. 내용은 응답 한번에 전부 작성하지 않아도 됩니다. 답변이 잘리더라도 다시 작성할 수 있습니다.
       2. 양식 : ${form}
-      3. 필요하다면 인터넷 검색 결과를 바탕으로 보고서를 작성해야 합니다.
-      4. 인터넷 검색 결과를 사용할 경우 마지막에 "참고문헌" 차례에 구체적인 참고문헌 url 링크를 첨부해야 합니다.
-      5. 에세이는 명확한 어휘를 사용하고, 설명하듯이 작성해야 합니다.
-      6. 아래 에세이 주제에 따라 작성하세요.
-      7. 본문은 축약형이 아닌 줄글, 서술형의 형태로 작성되어야 합니다.
-      8. 각각의 본론에 대해서 하위 항목이 2단계 이상 있으면 안됩니다.
+      3. 주어진 양식이 따로 없다면 적절한 양식으로 보고서를 작성해야합니다.
+      4. 필요하다면 인터넷 검색 결과를 바탕으로 보고서를 작성해야 합니다.
+      5. 인터넷 검색 결과를 사용할 경우 마지막에 "참고문헌" 차례에 구체적인 참고문헌 url 링크를 첨부해야 합니다.
+      6. 보고서의 제목을 선정해서 보고서 상단에 기입해야 합니다.
+      7. 아래 보고서 주제에 따라 작성하세요.
+      8. (!중요) 본문은 줄글 형태의 긴 문단들로 작성되어야 합니다. 하위 항목들을 나열하지 마세요!
+      9. 제목인 h1, 목차인 h2, 하위 목차인 h3 를 파악해서 #, ##, ### 를 앞에 붙여서 작성해야 합니다. ('#'을 4개 이상 붙이지 마세요!)
       </조건>
       
       <참고사항>
@@ -540,7 +541,7 @@ export class DocumentService {
       id: documentId,
     });
 
-    const total_prompt = `${document.prompt} 다음 사용자와 질의응답을 고려해서 작성해주세요. \n${addPrompt}`;
+    const total_prompt = `${document.prompt} \n${addPrompt}`;
 
     document.prompt = total_prompt;
     return this.documentRepository.save(document);
@@ -554,7 +555,7 @@ export class DocumentService {
       throw new Error('Document not found');
     }
     const content: string = await this.downloadContentFromS3(document.url);
-  
+
     const paragraphs = await Promise.all(
       content.split('\n').map(async (line) => {
         const matches = line.match(/<<(\d+)>>/);
@@ -566,16 +567,16 @@ export class DocumentService {
           if (file && file.url) {
             const imageBuffer = await this.downloadImageFromS3(file.url);
             const dimensions = sizeOf(imageBuffer);
-  
+
             let width = dimensions.width;
             let height = dimensions.height;
-  
+
             if (width > 300) {
               const aspectRatio = width / height;
               width = 300;
               height = width / aspectRatio;
             }
-  
+
             return new Paragraph({
               children: [
                 new ImageRun({
@@ -589,7 +590,7 @@ export class DocumentService {
             });
           }
         }
-  
+
         // 스타일 적용 예시
         if (line.startsWith('# ')) {
           return new Paragraph({
@@ -618,7 +619,7 @@ export class DocumentService {
             heading: HeadingLevel.HEADING_2,
             spacing: { after: 100 },
           });
-        } else if(line.startsWith('### ')) {
+        } else if (line.startsWith('### ')) {
           return new Paragraph({
             children: [
               new TextRun({
@@ -631,8 +632,7 @@ export class DocumentService {
             heading: HeadingLevel.HEADING_3,
             spacing: { after: 50 },
           });
-        }
-        else {
+        } else {
           return new Paragraph({
             children: [
               new TextRun({
@@ -644,7 +644,7 @@ export class DocumentService {
         }
       }),
     );
-  
+
     const doc = new WordDocument({
       sections: [
         {
@@ -653,14 +653,14 @@ export class DocumentService {
         },
       ],
     });
-  
+
     const buffer = await Packer.toBuffer(doc);
-  
+
     // Upload to S3
     const shortFileName = document.title.substring(0, 10).replace(/\s/g, '-'); // 20글자로 제한
     const fileName = `${shortFileName}-${uuidv4()}.docx`;
     const filePath = path.join('documents', fileName);
-  
+
     const params = {
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: filePath,
@@ -668,7 +668,7 @@ export class DocumentService {
       ContentType:
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     };
-  
+
     try {
       const data = await this.s3.upload(params).promise();
       document.wordUrl = data.Location;
@@ -679,7 +679,6 @@ export class DocumentService {
       throw new Error('Error uploading file to S3');
     }
   }
-  
 
   async downloadContentFromS3(url: string): Promise<string> {
     const parsedUrl = new URL(url);
