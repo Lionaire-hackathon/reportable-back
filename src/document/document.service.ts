@@ -322,16 +322,18 @@ export class DocumentService {
   }
 
   async uploadContentToS3(content: string, title: string): Promise<string> {
-    const fileName = `${title}-${uuidv4()}.txt`;
+    // 기존 파일 이름 생성 부분
+    const shortFileName = title.substring(0, 10).replace(/\s/g, '-'); // 20글자로 제한
+    const fileName = `${shortFileName}-${uuidv4()}.txt`;
     const filePath = path.join('documents', fileName);
-
+  
     const params = {
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: filePath,
       Body: content,
       ContentType: 'text/plain',
     };
-
+  
     try {
       const data = await this.s3.upload(params).promise();
       return data.Location;
@@ -340,7 +342,7 @@ export class DocumentService {
       throw new Error('Error uploading file to S3');
     }
   }
-
+  
   async edit(editDocumentDto: EditDocumentDto) {
     const { document_id, prompt, content_before } = editDocumentDto;
 
@@ -552,7 +554,7 @@ export class DocumentService {
       throw new Error('Document not found');
     }
     const content: string = await this.downloadContentFromS3(document.url);
-
+  
     const paragraphs = await Promise.all(
       content.split('\n').map(async (line) => {
         const matches = line.match(/<<(\d+)>>/);
@@ -564,16 +566,16 @@ export class DocumentService {
           if (file && file.url) {
             const imageBuffer = await this.downloadImageFromS3(file.url);
             const dimensions = sizeOf(imageBuffer);
-
+  
             let width = dimensions.width;
             let height = dimensions.height;
-
+  
             if (width > 300) {
               const aspectRatio = width / height;
               width = 300;
               height = width / aspectRatio;
             }
-
+  
             return new Paragraph({
               children: [
                 new ImageRun({
@@ -587,7 +589,7 @@ export class DocumentService {
             });
           }
         }
-
+  
         // 스타일 적용 예시
         if (line.startsWith('# ')) {
           return new Paragraph({
@@ -642,7 +644,7 @@ export class DocumentService {
         }
       }),
     );
-
+  
     const doc = new WordDocument({
       sections: [
         {
@@ -651,13 +653,14 @@ export class DocumentService {
         },
       ],
     });
-
+  
     const buffer = await Packer.toBuffer(doc);
-
+  
     // Upload to S3
-    const fileName = `${document.title}-${uuidv4()}.docx`;
+    const shortFileName = document.title.substring(0, 10).replace(/\s/g, '-'); // 20글자로 제한
+    const fileName = `${shortFileName}-${uuidv4()}.docx`;
     const filePath = path.join('documents', fileName);
-
+  
     const params = {
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: filePath,
@@ -665,7 +668,7 @@ export class DocumentService {
       ContentType:
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     };
-
+  
     try {
       const data = await this.s3.upload(params).promise();
       document.wordUrl = data.Location;
@@ -676,6 +679,7 @@ export class DocumentService {
       throw new Error('Error uploading file to S3');
     }
   }
+  
 
   async downloadContentFromS3(url: string): Promise<string> {
     const parsedUrl = new URL(url);
