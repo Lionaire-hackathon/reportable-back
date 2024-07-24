@@ -7,6 +7,9 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
+// 파일 타입 정의 : 첨부용 / 분석용
+export type FileType = 'attachment' | 'analysis';
+
 @Entity()
 export class File {
   @PrimaryGeneratedColumn()
@@ -14,6 +17,9 @@ export class File {
 
   @Column()
   name: string;
+
+  @Column()
+  type: FileType;
 
   @Column()
   description: string;

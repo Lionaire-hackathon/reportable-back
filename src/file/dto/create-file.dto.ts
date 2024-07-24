@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { FileType } from '../entity/file.entity';
 
 export class CreateFileDto {
   @ApiProperty({
@@ -24,4 +25,10 @@ export class CreateFileDto {
     description: 'The title of the file',
   })
   url: string;
+
+  @ApiProperty({
+    example: 'attachment',
+    description: 'The type of the file',
+  })
+  type: FileType;
 }
