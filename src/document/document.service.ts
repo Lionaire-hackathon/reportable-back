@@ -113,8 +113,8 @@ export class DocumentService {
     const response = await this.claudeApiCall(
       document,
       `에세이 주제 "${document.title}"에 대해 답변하기 위해서 내용과 관련해서 너가 모르는 정보나 사용자의 견해 등 추가적으로 받아야 할 정보가 있어? 있으면 
-      { needMorePrompt: 1, prompt: ["질문1 내용", "질문2 내용",...]} 형태로 대답하고, 없으면 
-      { needMorePrompt: 0 } 으로 대답해 (중요!)대답은 반드시 JSON 형식이어야만 해`,
+      { "needMorePrompt" : 1, "prompt": ["질문1 내용", "질문2 내용",...]} 형태로 대답하고, 없으면 
+      { "needMorePrompt" : 0 } 으로 대답해 (중요!)대답은 반드시 JSON 형식이어야만 해`,
     );
 
     return response;
@@ -176,8 +176,7 @@ export class DocumentService {
       model: 'claude-3-5-sonnet-20240620',
       max_tokens: 8192,
       messages: [
-        { role: 'user', content: promptHistory[0]['content'] },
-        { role: 'assistant', content: promptHistory[1]['content'] },
+        { role: 'assistant', content: [promptHistory[0]['content'], promptHistory[1]['content']] },
         { role: 'user', content: 'Continue.' },
       ],
     };
@@ -294,7 +293,7 @@ export class DocumentService {
         });
         combinedContent.push({
           type: 'text',
-          text: `이미지 이름: ${image.name}\n이미지 설명: ${image.description} 이미지ID: ${image.id}`,
+          text: `이미지 이름: ${image.name ? image.name : "없음"}\n이미지 설명: ${image.description ? image.description  : "없음"} 이미지ID: ${image.id} 이미지 type: ${image.type}`,
         });
       });
     } catch (error) {
@@ -429,16 +428,21 @@ export class DocumentService {
     const { type, title, prompt, amount, form, elements, core, files } =
       document;
 
-    const formatFiles = (files: File[]): string => {
-      return files
-        .map(
-          (file) => `
-    파일명: ${file.name}
-    파일ID: ${file.id}
-    ---------`,
-        )
-        .join('\n');
-    };
+      const formatFiles = (files: File[]): string => {
+        return files
+          .filter(file => file.type === "attachment")
+          .map(
+            (file) => `
+      파일명: ${file.name}
+      파일ID: ${file.id}
+      파일 설명: ${file.description}
+      파일 타입: ${file.type}
+      ---------
+            `,
+          )
+          .join('\n');
+      };
+      
 
     if (type === 'essay') {
       return `
@@ -455,7 +459,7 @@ export class DocumentService {
       5. 인터넷 검색 결과를 사용할 경우 마지막에 "참고문헌" 차례에 구체적인 참고문헌 url 링크를 첨부해야 합니다.
       6. 보고서의 제목을 선정해서 보고서 상단에 기입해야 합니다.
       7. 아래 보고서 주제에 따라 작성하세요.
-      8. (!중요) 본문은 줄글 형태의 긴 문단들로 작성되어야 합니다. 하위 항목들을 나열하지 마세요!
+      8. (!중요) 본문은 줄글 형태의 긴 문장들로 작성되어야 합니다. 하위 항목들을 나열하지 마세요!
       9. 제목인 h1, 목차인 h2, 하위 목차인 h3 를 파악해서 #, ##, ### 를 앞에 붙여서 작성해야 합니다. ('#'을 4개 이상 붙이지 마세요!)
       </조건>
       
@@ -486,16 +490,18 @@ export class DocumentService {
       4. 인터넷 검색 결과를 사용할 경우 마지막에 "참고문헌" 차례에 구체적인 참고문헌 url 링크를 첨부해야 합니다.
       5. 보고서는 명확한 어휘를 사용해서 작성해야 합니다.
       6. 아래 제시된 보고서의 핵심내용을 반드시 반영해야 합니다.
-      7. 첨부된 이미지나 도표를 분석해서 실험 결과에 반영해야 합니다. 
-      8. 첨부된 이미지는 사용되는 위치에 배치되어야 합니다.
+      7. 첨부된 이미지나 도표를 분석해서 분석 내용을 반영해서 실험 결과를 작성해야 합니다.
+      8. 첨부용 이미지(type="attachment"인 경우)는 사용되는 위치에 배치되어야 합니다.
       9. 보고서는 관련 개념까지 확장 설명하며, 내용이 풍부해야 합니다.
-      10. 주제인 h1, 목차인 h2 를 파악해서 #, ## 를 앞에 붙여서 작성해야 합니다.
-      11. "-"를 통해 나열하듯이 쓰지 말고 한 소주제에 대해 한번에 줄글로 작성해야 합니다.
+      10. 제목인 h1, 목차인 h2, 하위 목차인 h3 를 파악해서 #, ##, ### 를 앞에 붙여서 작성해야 합니다. ('#'을 4개 이상 붙이지 마세요!)
+      11. "-"를 통해 나열하듯이 쓰지 말고 한 소주제에 대해 한번에 긴 줄글로 작성해야 합니다.
+      12. 실험 결과(본문)와 분석은 분량이 엄청 많아야 합니다.
 
       </조건>
 
       <첨부파일>
-      첨부파일을 사용할 때에는 본문 속에 <<{파일ID 값}>>과 같이 작성해야 합니다. 아래는 사용가능한 파일 리스트와 파일의 내용들입니다.
+      첨부용 이미지를 사용할 때에는 본문 속에 <<{파일ID 값}>>과 같이 작성해야 합니다.
+      아래는 사용가능한 첨부용(attachment) 파일 리스트와 파일의 내용들입니다. 분석용(analysis) 파일은 본문에 사용하지 않아도 됩니다.
 
       ${files ? formatFiles(files) : '첨부파일이 없습니다.'}
 
@@ -512,43 +518,7 @@ export class DocumentService {
       <보고서 주제>
       ${title}
       </보고서 주제>
-      
-      <예시>
-      원소 분석 및 어는점 내림
-      1. 초록 (Abstract)
-      본 실험은 원자분석기로 미지시료의 실험식을 결정하고, 어는점 내림을 통해 미지시료의 분자량을 구해 종류를 판별하는 것이다. 미지시료 Red와 Green을 각각 원소분석기로 탄소, 수소의 질량 백분율의 정보를 얻었고, Red와 Green 용액의 어는점 내림을 측정해 어는점 내림 공식으로 두 미지시료의 분자량을 각각 구할 수 있었다. 분석 결과, Red와 Green의 탄소, 수소, 산소의 개수비는 각각 12:22.168:11.076, 6:12.194:6.093이며, 어는점 내림으로 계산한 결과, 분자량은 각각 338.18g/mol, 177.14g/mol로 얻었다. 따라서, 미지시료 Red는 Saccharose(C₁₂H₂₂O₁₁), 미지시료 Green은 Dextrose(C₆H₁₂O₆)임을 판별하고 확인할 수 있었다. 오차원인으로는 크게 불순물에 의한 부정확한 원소 개수비와 용액의 총괄성을 비이상용액에 적용했다는 점을 생각해볼 수 있었으며, 이 실험은 다른 유기분자의 실험식과 종류를 판별하는데에도 활용될 수 있다고 기대해볼 수 있다.
 
-      2. 실험 목적 (Objective)
-      이 실험의 목적은 원소분석기와 어는점 내림 실험을 통해 미지시료의 화학적 성분과 분자량을 정확히 분석하여 그 종류를 판별하는 것이다. 이를 통해 분석 기술의 정확성과 유효성을 검증하고, 화학적 분석의 기본 원리를 이해하며, 실험 데이터를 통해 실험 결과를 도출하는 방법을 습득한다.
-
-      3. 실험 재료 및 방법 (Materials and Methods)
-      실험에는 미지시료 Red와 Green, 원소분석기, 증류수, NaCl, 온도 센서, 얼음과 꽃소금, 바이알, 비커, 저울 등이 사용되었다. 먼저 원소 분석을 위해 Red 미지시료 2.031mg과 Green 미지시료 2.059mg을 원소분석기에 넣어 탄소와 수소의 질량 백분율을 측정하였다. 그 후 측정된 탄소와 수소의 질량 백분율을 바탕으로 산소의 질량 백분율을 계산하고, 이를 통해 각 원소의 질량 백분율을 사용하여 원자량을 계산하였다. 이러한 과정을 통해 각 미지시료의 실험식을 도출하였다.
-
-      어는점 내림 실험을 위해 증류수 5mL에 미지시료 Red와 Green 각각 1g을 녹여 용액을 준비하였다. 또한 NaCl 0.1g을 증류수 5mL에 녹여 NaCl 용액을 준비하였다. 각 용액을 얼음과 꽃소금이 담긴 비커에 넣고 온도 센서를 사용해 10초마다 10분 동안 온도를 측정하였다. 이렇게 측정된 온도를 바탕으로 각 용액의 어는점을 구하고, 어는점 내림 공식을 이용해 미지시료의 분자량을 계산하였다.
-
-      4. 실험 결과 (Results)
-        4.1 원소 분석 결과
-        시료	탄소 (%)	수소 (%)	산소 (%)	실험식
-        Red	41.9392	6.5029	51.5579	C₁₂H₂₂O₁₁
-        Green	39.6446	6.7624	53.5930	C₆H₁₂O₆
-        4.2 어는점 내림 결과
-        용액	어는점 (℃)	분자량 (g/mol)
-        증류수	0	-
-        NaCl 용액	-1.3	-
-        Red 용액	-1.1	338.18
-        Green 용액	-2.1	177.14
-      5. 데이터 분석 및 논의 (Data Analysis and Discussion)
-      원소 분석 결과를 이론값과 비교한 결과, 미지시료의 실험식을 확인할 수 있었다. 그러나 분석 과정에서 불순물이나 공기 중의 CO₂와 H₂O의 영향을 받을 가능성이 있어 이러한 오차의 원인을 논의하였다. 어는점 내림 실험에서는 계산된 분자량이 이론값과 유사함을 확인하였으며, NaCl 용액의 경우 이론값과의 차이를 논의하고 비이상용액의 특성에 대해 설명하였다. 또한 실험 조건과 측정 기기의 한계로 인해 발생할 수 있는 오차 요인들을 분석하였다.
-
-      6. 결론 (Conclusion)
-      실험 결과, 원소분석기와 어는점 내림 실험을 통해 미지시료 Red는 Saccharose, Green은 Dextrose임을 확인하였다. 이러한 실험 결과를 바탕으로 분석 방법의 정확성과 유효성을 검증할 수 있었으며, 이 실험 방법이 다른 유기분자의 분석에도 활용될 수 있음을 논의하였다.
-
-      7. 참고문헌 (References)
-      김희준, 일반화학실험, 2010, 자유아카데미, 33-45.
-      David W. Oxtoby, H. P. Gills, Alan Campion, Principles of Modern Chemistry, 7th edition, 2011, Cengage Learning, 495-497.
-      </예시>
-
-      예시에 있는 정도보다 더 풍부하게 내용을 더 추가해주세요.
       `;
     }
   }
