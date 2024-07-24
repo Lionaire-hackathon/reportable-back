@@ -13,7 +13,6 @@ import {
 import { DocumentService } from './document.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { JwtGuard } from 'src/auth/guard/jwt.guard';
-import { DocumentDto } from './dto/document.dto';
 import { ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { EditDocumentDto } from './dto/edit-document.dto';
 import { EditPromptDto } from './dto/edit-prompt.dto';
@@ -45,7 +44,7 @@ export class DocumentController {
   }
   // 문서의 내용을 생성합니다.
   @ApiBearerAuth('JWT')
-  //@UseGuards(JwtGuard) // JwtGuard를 사용하여 JWT를 검증합니다.
+  @UseGuards(JwtGuard) // JwtGuard를 사용하여 JWT를 검증합니다.
   @Put('content/:id')
   createContent(@Param('id') documentId: number) {
     return this.documentService.createContent(documentId);
@@ -57,8 +56,8 @@ export class DocumentController {
   }
   // 문서의 내용 수정하기
   @ApiBearerAuth('JWT')
-  @UseGuards(JwtGuard) // JwtGuard를 사용하여 JWT를 검증합니다.
-  @Patch('edit')
+  @UseGuards(JwtGuard)
+  @Patch('edit') // 문서의 내용을 프롬프트를 기반으로 수정합니다.
   edit(@Body() editDocumentDto: EditDocumentDto) {
     return this.documentService.edit(editDocumentDto);
   }
@@ -72,7 +71,7 @@ export class DocumentController {
 
   @ApiBearerAuth('JWT')
   @UseGuards(JwtGuard)
-  @Put('edit-prompt')
+  @Put('edit-prompt') // firstPrompt 질문을 통해 얻은 답변을 프롬프트에 추가합니다.
   editPrompt(@Body() editPromptDto: EditPromptDto) {
     return this.documentService.editPrompt(editPromptDto);
   }

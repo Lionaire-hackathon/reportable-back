@@ -23,6 +23,16 @@ import {
   AlignmentType,
 } from 'docx';
 import sizeOf from 'image-size';
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+interface ChatCompletionMessageParam {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY,
@@ -326,14 +336,14 @@ export class DocumentService {
     const shortFileName = title.substring(0, 10).replace(/\s/g, '-'); // 20글자로 제한
     const fileName = `${shortFileName}-${uuidv4()}.txt`;
     const filePath = path.join('documents', fileName);
-  
+
     const params = {
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: filePath,
       Body: content,
       ContentType: 'text/plain',
     };
-  
+
     try {
       const data = await this.s3.upload(params).promise();
       return data.Location;
@@ -342,57 +352,66 @@ export class DocumentService {
       throw new Error('Error uploading file to S3');
     }
   }
-  
+
   async edit(editDocumentDto: EditDocumentDto) {
     const { document_id, prompt, content_before } = editDocumentDto;
-
-    const final_prompt = `Edit chosen part, ${content_before}, as following instruction. ${prompt} \n Retrieve only result of edited part as response, not all the total document.`;
 
     const document = await this.documentRepository.findOne({
       where: { id: document_id },
     });
-    const url_document = document.url;
-    const documentContent = await this.downloadContentFromS3(url_document);
+    console.log(document);
+    const document_url = document.url;
+    const documentContent = await this.downloadContentFromS3(document_url);
 
-    const content_after = await this.claudeApiEditCall(
-      final_prompt,
+    const content_after = await this.gptApiCall(
       documentContent,
+      content_before,
+      prompt,
     );
     const updatedContent = documentContent.replace(
       content_before,
       content_after,
     );
 
-    const s3Url = await this.updateContentToS3(updatedContent, url_document);
+    const s3Url = await this.updateContentToS3(updatedContent, document_url);
 
     return s3Url;
   }
 
-  async claudeApiEditCall(prompt: string, content: string): Promise<string> {
-    const headers = {
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-      'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15',
-    };
+  async gptApiCall(
+    documentContent: string,
+    content_before: string,
+    prompt: string,
+  ): Promise<string> {
+    const messages: ChatCompletionMessageParam[] = [
+      {
+        role: 'system',
+        content:
+          '당신은 문서 전체 내용을 기반으로, 수정해야할 부분을 받고 수정 요청사항을 반영하여 수정된 부분을 제공해야 합니다.',
+      },
+      {
+        role: 'user',
+        content: `다음은 문서의 내용입니다: "${documentContent}"\n\n수정할 내용은 다음과 같습니다: "${content_before}"\n\n수정 요청 사항은 다음과 같습니다: "${prompt}"\n\n수정된 내용을 { "content_after": "수정된 내용" } 형태로 제공해주세요.`,
+      },
+    ];
 
-    const data = {
-      model: 'claude-3-5-sonnet-20240620',
-      max_tokens: 512,
-      messages: [
-        {
-          role: 'user',
-          content: `Here is the total document content: ${content}.\nPlease edit it as follows:\n${prompt}`,
-        },
-      ],
-    };
+    try {
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini-2024-07-18',
+        messages: messages,
+      });
 
-    const response = await axios.post(
-      'https://api.anthropic.com/v1/messages',
-      data,
-      { headers },
-    );
-    return response.data.content[0].text;
+      const response = completion.choices[0].message.content.trim();
+      console.log("response: ", response);
+      if (!response) {
+        throw new Error('GPT API response is empty');
+      }
+      const content_after = JSON.parse(response).content_after;
+      return content_after;
+    } catch (error) {
+      console.error('Error during GPT API call:', error);
+      throw new Error('Failed to generate the content using GPT API');
+    }
   }
 
   async getText(documentId: number): Promise<string> {
@@ -554,7 +573,7 @@ export class DocumentService {
       throw new Error('Document not found');
     }
     const content: string = await this.downloadContentFromS3(document.url);
-  
+
     const paragraphs = await Promise.all(
       content.split('\n').map(async (line) => {
         const matches = line.match(/<<(\d+)>>/);
@@ -566,16 +585,16 @@ export class DocumentService {
           if (file && file.url) {
             const imageBuffer = await this.downloadImageFromS3(file.url);
             const dimensions = sizeOf(imageBuffer);
-  
+
             let width = dimensions.width;
             let height = dimensions.height;
-  
+
             if (width > 300) {
               const aspectRatio = width / height;
               width = 300;
               height = width / aspectRatio;
             }
-  
+
             return new Paragraph({
               children: [
                 new ImageRun({
@@ -589,7 +608,7 @@ export class DocumentService {
             });
           }
         }
-  
+
         // 스타일 적용 예시
         if (line.startsWith('# ')) {
           return new Paragraph({
@@ -618,7 +637,7 @@ export class DocumentService {
             heading: HeadingLevel.HEADING_2,
             spacing: { after: 100 },
           });
-        } else if(line.startsWith('### ')) {
+        } else if (line.startsWith('### ')) {
           return new Paragraph({
             children: [
               new TextRun({
@@ -631,8 +650,7 @@ export class DocumentService {
             heading: HeadingLevel.HEADING_3,
             spacing: { after: 50 },
           });
-        }
-        else {
+        } else {
           return new Paragraph({
             children: [
               new TextRun({
@@ -644,7 +662,7 @@ export class DocumentService {
         }
       }),
     );
-  
+
     const doc = new WordDocument({
       sections: [
         {
@@ -653,14 +671,14 @@ export class DocumentService {
         },
       ],
     });
-  
+
     const buffer = await Packer.toBuffer(doc);
-  
+
     // Upload to S3
     const shortFileName = document.title.substring(0, 10).replace(/\s/g, '-'); // 20글자로 제한
     const fileName = `${shortFileName}-${uuidv4()}.docx`;
     const filePath = path.join('documents', fileName);
-  
+
     const params = {
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: filePath,
@@ -668,7 +686,7 @@ export class DocumentService {
       ContentType:
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     };
-  
+
     try {
       const data = await this.s3.upload(params).promise();
       document.wordUrl = data.Location;
@@ -679,7 +697,6 @@ export class DocumentService {
       throw new Error('Error uploading file to S3');
     }
   }
-  
 
   async downloadContentFromS3(url: string): Promise<string> {
     const parsedUrl = new URL(url);
