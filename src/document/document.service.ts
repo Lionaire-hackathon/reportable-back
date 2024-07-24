@@ -558,6 +558,10 @@ export class DocumentService {
     if (!document) {
       throw new Error('Document not found');
     }
+
+    if(document.wordUrl) {
+      return document.wordUrl;
+    }
     const content: string = await this.downloadContentFromS3(document.url);
 
     const paragraphs = await Promise.all(
