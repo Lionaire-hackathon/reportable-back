@@ -15,6 +15,8 @@ import { MessageParam } from '@anthropic-ai/sdk/resources';
 import axios from 'axios';
 import { EditPromptDto } from './dto/edit-prompt.dto';
 import { Document as WordDocument, Packer, Paragraph, TextRun } from 'docx';
+import { Pinecone } from '@pinecone-database/pinecone';
+import { OpenAI } from 'openai';
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY,
@@ -38,6 +40,33 @@ export class DocumentService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
   ) {}
+
+  async queryrag(pinc: Pinecone, query: string) {
+    const pc = pinc;
+    const index = pc.index('reportable-vectordb');
+
+    // Get embeddings from OpenAI, upstage
+    const openai = new OpenAI({
+      apiKey: process.env.UPSTAGE_API_KEY,
+      baseURL: 'https://api.upstage.ai/v1/solar',
+    });
+
+    const embeddings = await openai.embeddings.create({
+      model: 'solar-embedding-1-large-query',
+      input: query,
+    });
+
+    const embedding = embeddings.data['embedding'];
+
+    // Get Query from Pinecone serviceless DB
+    const queryResponse = await index.namespace('default').query({
+      topK: 3,
+      vector: embedding,
+      includeValues: true,
+    });
+
+    return queryResponse.matches;
+  }
 
   async create(
     createDocumentDto: CreateDocumentDto,
@@ -172,13 +201,13 @@ export class DocumentService {
     };
     console.log(prompt);
     try {
-    const response = await axios.post(
-      'https://api.anthropic.com/v1/messages',
-      data,
-      { headers },
-    );
-    console.log(response.data.content[0].text);
-    return response.data;
+      const response = await axios.post(
+        'https://api.anthropic.com/v1/messages',
+        data,
+        { headers },
+      );
+      console.log(response.data.content[0].text);
+      return response.data;
     } catch (error) {
       console.log(error);
     }
@@ -210,7 +239,7 @@ export class DocumentService {
     // URL 리스트를 받아서 각 URL의 테이블 데이터를 처리하여 반환
     return null;
   }
-  
+
   async claudeApiCallWithFiles(
     document: Document,
     prompt: string,
@@ -221,16 +250,16 @@ export class DocumentService {
       'anthropic-version': '2023-06-01',
       'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15',
     };
-  
+
     const { imageFiles, spreadsheetFiles } = classifyFiles(document.files);
-  
+
     let images = [];
     try {
       images = await this.fetchImageData(imageFiles);
     } catch (error) {
       console.error('Error fetching image data:', error);
     }
-  
+
     let tables = [];
     try {
       tables = await this.fetchAndProcessTableData(
@@ -239,9 +268,9 @@ export class DocumentService {
     } catch (error) {
       console.error('Error fetching table data:', error);
     }
-  
+
     let combinedContent: Array<any> = []; // Start with the prompt
-  
+
     try {
       images.forEach((image) => {
         combinedContent.push({
@@ -269,7 +298,6 @@ export class DocumentService {
       model: 'claude-3-5-sonnet-20240620',
       max_tokens: 8192,
       messages: [
-        ...imageMessages,
         {
           role: 'user',
           content: [
@@ -277,12 +305,12 @@ export class DocumentService {
             {
               type: 'text',
               text: prompt,
-            }
-          ]
+            },
+          ],
         },
       ],
     };
-  
+
     try {
       const response = await axios.post(
         'https://api.anthropic.com/v1/messages',
@@ -295,8 +323,6 @@ export class DocumentService {
       throw new Error('Failed to complete Claude API call');
     }
   }
-  
-  
 
   async uploadContentToS3(content: string, title: string): Promise<string> {
     const fileName = `${title}-${uuidv4()}.txt`;
@@ -529,7 +555,7 @@ export class DocumentService {
       sections: [
         {
           properties: {},
-          children: content.split('\n').map(line => new Paragraph(line)),
+          children: content.split('\n').map((line) => new Paragraph(line)),
         },
       ],
     });
@@ -544,7 +570,8 @@ export class DocumentService {
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: filePath,
       Body: buffer,
-      ContentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ContentType:
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     };
 
     try {
