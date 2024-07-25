@@ -69,7 +69,7 @@ export class DocumentService {
     //const projectRoot = path.resolve(__dirname, '..', '..');
     //const jsonFilePath = path.join(projectRoot, 'id2text.json');
     const jsonFilePath = path.join(process.cwd(), 'id2text.json');
-    console.log("jsonFilePath: ", jsonFilePath)
+    console.log('jsonFilePath: ', jsonFilePath);
     const jsonData = JSON.parse(fs.readFileSync(jsonFilePath, 'utf-8'));
     const openai = new OpenAI({
       apiKey: process.env.UPSTAGE_API_KEY,
@@ -114,7 +114,7 @@ export class DocumentService {
     } catch (error) {
       console.log(error);
     }
-    
+
     if (!user) {
       throw new Error('User not found');
     }
@@ -437,6 +437,10 @@ export class DocumentService {
       exact_content_before,
       content_after,
     );
+    console.log("exact_content_before: ", exact_content_before);
+    console.log("content_after: ", content_after);
+
+    console.log('updatedContent: ', updatedContent);
 
     const s3Url = await this.updateContentToS3(updatedContent, document.url);
 
@@ -455,8 +459,9 @@ export class DocumentService {
     // Update the document URL
     document.url = s3Url;
     await this.documentRepository.save(document);
+    const updatedWordUrl = await this.getDocFile(document_id);
 
-    return { s3Url, editId: edit.id };
+    return { s3Url, wordUrl: updatedWordUrl, editId: edit.id };
   }
 
   async gptApiCall(
@@ -707,10 +712,6 @@ export class DocumentService {
     });
     if (!document) {
       throw new Error('Document not found');
-    }
-
-    if (document.wordUrl) {
-      return document.wordUrl;
     }
     const content: string = await this.downloadContentFromS3(document.url);
 
