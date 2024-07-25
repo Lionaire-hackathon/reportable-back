@@ -43,11 +43,14 @@ export class Document {
   @Column({ length: 1000 })
   core: string;
 
-  @Column({ length: 5000 })
+  @Column({ length: 2000 })
   url: string;
 
-  @Column({length: 5000})
+  @Column({length: 2000})
   wordUrl: string;
+
+  @Column({length: 3800})
+  retrieval: string;
 
   @Column({ default: 0 }) // default value 0 token으로 설정
   used_input_tokens: number;
