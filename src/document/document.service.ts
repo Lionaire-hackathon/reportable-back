@@ -11,12 +11,36 @@ import { EditDocumentDto } from './dto/edit-document.dto';
 import { File } from 'src/file/entity/file.entity';
 import { classifyFiles, classifyImageType } from 'src/utils/file-utils';
 import { ClaudeImageApiObject } from './dto/claude-api-objects.dto';
-import { MessageParam } from '@anthropic-ai/sdk/resources';
 import axios from 'axios';
 import { EditPromptDto } from './dto/edit-prompt.dto';
 import { Document as WordDocument, Packer, Paragraph, TextRun } from 'docx';
 import { Pinecone } from '@pinecone-database/pinecone';
 import { OpenAI } from 'openai';
+import {
+  Document as WordDocument,
+  Packer,
+  Paragraph,
+  TextRun,
+  ImageRun,
+  HeadingLevel,
+  AlignmentType,
+} from 'docx';
+import sizeOf from 'image-size';
+import OpenAI from 'openai';
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+interface ChatCompletionMessageParam {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+interface PromptHistory {
+  role: string;
+  content: string;
+}
 
 AWS.config.update({
   accessKeyId: process.env.AWS_ACCESS_KEY,
@@ -39,7 +63,10 @@ export class DocumentService {
     private documentRepository: Repository<Document>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(File)
+    private fileRepository: Repository<File>,
   ) {}
+
 
   async queryrag(pinc: Pinecone, query: string) {
     const pc = pinc;
@@ -66,6 +93,9 @@ export class DocumentService {
     });
 
     return queryResponse.matches;
+
+  async findOne(documentId: number): Promise<Document> {
+    return this.documentRepository.findOneBy({ id: documentId });
   }
 
   async create(
@@ -80,7 +110,7 @@ export class DocumentService {
     if (!user) {
       throw new Error('User not found');
     }
-
+    const retrieval = await this.SOME_RETRIEVAL_FUNCTION(core);
     const post = this.documentRepository.create({
       title,
       amount,
@@ -95,6 +125,18 @@ export class DocumentService {
     return this.documentRepository.save(post);
   }
 
+  async deleteDocument(documentId: number): Promise<Document> {
+    const document = await this.documentRepository.findOneBy({
+      id: documentId,
+    });
+
+    if (!document) {
+      throw new Error('Document not found');
+    }
+
+    return this.documentRepository.remove(document);
+  }
+
   async firstPrompt(documentId: number): Promise<any> {
     const document = await this.documentRepository.findOneBy({
       id: documentId,
@@ -106,8 +148,8 @@ export class DocumentService {
     const response = await this.claudeApiCall(
       document,
       `에세이 주제 "${document.title}"에 대해 답변하기 위해서 내용과 관련해서 너가 모르는 정보나 사용자의 견해 등 추가적으로 받아야 할 정보가 있어? 있으면 
-      { needMorePrompt: 1, prompt: ["질문1 내용", "질문2 내용",...]} 형태로 대답하고, 없으면 
-      { needMorePrompt: 0 } 으로 대답해 (중요!)대답은 반드시 JSON 형식이어야만 해`,
+      { "needMorePrompt" : 1, "prompt": ["질문1 내용", "질문2 내용",...]} 형태로 대답하고, 없으면 
+      { "needMorePrompt" : 0 } 으로 대답해 (중요!)대답은 반드시 JSON 형식이어야만 해`,
     );
 
     return response;
@@ -120,10 +162,12 @@ export class DocumentService {
     if (!document) {
       throw new Error('Document not found');
     }
-    let promptHistory: object[] = [];
+    let promptHistory: PromptHistory[] = [];
     let totalInputTokenCount: number = 0;
     let totalOutputTokenCount: number = 0;
     const prompt = await this.genPromptFromDoc(document);
+    console.log(prompt);
+
     promptHistory.push({ role: 'user', content: prompt });
     const response: ClaudeApiResponse =
       document.type === 'essay'
@@ -139,6 +183,9 @@ export class DocumentService {
     if (response.stop_reason === 'end_turn') {
       textOutput = response.content[0].text;
     } else {
+      console.log("response", response);
+      console.log("response stop reason", response.stop_reason);
+      console.log("prompt history", promptHistory);
       console.log('@@@Continuing the conversation...');
       const continuedResponse: ClaudeApiResponse =
         await this.claudeApiCallWithPromptHistory(document, promptHistory);
@@ -156,7 +203,7 @@ export class DocumentService {
 
   async claudeApiCallWithPromptHistory(
     document: Document,
-    promptHistory: object[],
+    promptHistory: PromptHistory[],
   ): Promise<ClaudeApiResponse> {
     const headers = {
       'x-api-key': process.env.ANTHROPIC_API_KEY,
@@ -169,18 +216,23 @@ export class DocumentService {
       model: 'claude-3-5-sonnet-20240620',
       max_tokens: 8192,
       messages: [
-        { role: 'user', content: promptHistory[0]['content'] },
-        { role: 'assistant', content: promptHistory[1]['content'] },
-        { role: 'user', content: 'Continue.' },
+        ...promptHistory,
+        {
+          role: 'user',
+          content: "Continue"
+        },
       ],
     };
-
+    try{
     const response = await axios.post(
       'https://api.anthropic.com/v1/messages',
       data,
       { headers },
     );
     return response.data;
+    } catch (error) {
+      console.log("claude api call with prompt history", error);
+    }
   }
 
   async claudeApiCall(
@@ -287,7 +339,7 @@ export class DocumentService {
         });
         combinedContent.push({
           type: 'text',
-          text: `이미지 이름: ${image.name}\n이미지 설명: ${image.description}`,
+          text: `이미지 이름: ${image.name ? image.name : '없음'}\n이미지 설명: ${image.description ? image.description : '없음'} 이미지ID: ${image.id} 이미지 type: ${image.type}`,
         });
       });
     } catch (error) {
@@ -325,7 +377,9 @@ export class DocumentService {
   }
 
   async uploadContentToS3(content: string, title: string): Promise<string> {
-    const fileName = `${title}-${uuidv4()}.txt`;
+    // 기존 파일 이름 생성 부분
+    const shortFileName = title.substring(0, 10).replace(/\s/g, '-'); // 20글자로 제한
+    const fileName = `${shortFileName}-${uuidv4()}.txt`;
     const filePath = path.join('documents', fileName);
 
     const params = {
@@ -347,53 +401,62 @@ export class DocumentService {
   async edit(editDocumentDto: EditDocumentDto) {
     const { document_id, prompt, content_before } = editDocumentDto;
 
-    const final_prompt = `Edit chosen part, ${content_before}, as following instruction. ${prompt} \n Retrieve only result of edited part as response, not all the total document.`;
-
     const document = await this.documentRepository.findOne({
       where: { id: document_id },
     });
-    const url_document = document.url;
-    const documentContent = await this.downloadContentFromS3(url_document);
+    console.log(document);
+    const document_url = document.url;
+    const documentContent = await this.downloadContentFromS3(document_url);
 
-    const content_after = await this.claudeApiEditCall(
-      final_prompt,
+    const content_after = await this.gptApiCall(
       documentContent,
+      content_before,
+      prompt,
     );
     const updatedContent = documentContent.replace(
       content_before,
       content_after,
     );
 
-    const s3Url = await this.updateContentToS3(updatedContent, url_document);
+    const s3Url = await this.updateContentToS3(updatedContent, document_url);
 
     return s3Url;
   }
 
-  async claudeApiEditCall(prompt: string, content: string): Promise<string> {
-    const headers = {
-      'x-api-key': process.env.ANTHROPIC_API_KEY,
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-      'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15',
-    };
+  async gptApiCall(
+    documentContent: string,
+    content_before: string,
+    prompt: string,
+  ): Promise<string> {
+    const messages: ChatCompletionMessageParam[] = [
+      {
+        role: 'system',
+        content:
+          '당신은 문서 전체 내용을 기반으로, 수정해야할 부분을 받고 수정 요청사항을 반영하여 수정된 부분을 제공해야 합니다.',
+      },
+      {
+        role: 'user',
+        content: `다음은 문서의 내용입니다: "${documentContent}"\n\n수정할 내용은 다음과 같습니다: "${content_before}"\n\n수정 요청 사항은 다음과 같습니다: "${prompt}"\n\n수정된 내용을 { "content_after": "수정된 내용" } 형태로 제공해주세요.`,
+      },
+    ];
 
-    const data = {
-      model: 'claude-3-5-sonnet-20240620',
-      max_tokens: 512,
-      messages: [
-        {
-          role: 'user',
-          content: `Here is the total document content: ${content}.\nPlease edit it as follows:\n${prompt}`,
-        },
-      ],
-    };
+    try {
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini-2024-07-18',
+        messages: messages,
+      });
 
-    const response = await axios.post(
-      'https://api.anthropic.com/v1/messages',
-      data,
-      { headers },
-    );
-    return response.data.content[0].text;
+      const response = completion.choices[0].message.content.trim();
+      console.log('response: ', response);
+      if (!response) {
+        throw new Error('GPT API response is empty');
+      }
+      const content_after = JSON.parse(response).content_after;
+      return content_after;
+    } catch (error) {
+      console.error('Error during GPT API call:', error);
+      throw new Error('Failed to generate the content using GPT API');
+    }
   }
 
   async getText(documentId: number): Promise<string> {
@@ -407,54 +470,21 @@ export class DocumentService {
     return this.downloadContentFromS3(document.url);
   }
 
-  async downloadContentFromS3(url: string): Promise<string> {
-    const parsedUrl = new URL(url);
-    const key = decodeURIComponent(parsedUrl.pathname.substring(1));
-
-    const params = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: key,
-    };
-
-    try {
-      const data = await this.s3.getObject(params).promise();
-      return data.Body.toString('utf-8');
-    } catch (error) {
-      console.error('Error downloading file from S3:', error);
-      throw new Error('Error downloading file from S3');
-    }
-  }
-
-  async updateContentToS3(content: string, url: string): Promise<string> {
-    const parsedUrl = new URL(url);
-    const key = decodeURIComponent(parsedUrl.pathname.substring(1));
-
-    const params = {
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: key,
-      Body: content,
-      ContentType: 'text/plain',
-    };
-
-    try {
-      const data = await this.s3.upload(params).promise();
-      return data.Location;
-    } catch (error) {
-      console.error('Error uploading file to S3:', error);
-      throw new Error('Error uploading file to S3');
-    }
-  }
-
   async genPromptFromDoc(document: Document): Promise<string> {
-    const { type, title, prompt, amount, form, elements, core, files } =
+    const { type, title, prompt, amount, form, elements, core, files, retrieval } =
       document;
 
     const formatFiles = (files: File[]): string => {
       return files
+        .filter((file) => file.type === 'attachment')
         .map(
           (file) => `
-    파일명: ${file.name}
-    ---------`,
+      파일명: ${file.name}
+      파일ID: ${file.id}
+      파일 설명: ${file.description}
+      파일 타입: ${file.type}
+      ---------
+            `,
         )
         .join('\n');
     };
@@ -469,12 +499,13 @@ export class DocumentService {
       <조건>
       1. 분량은 반드시 한글기준 공백 포함 ${amount}자 이상으로 작성해야 합니다. 내용은 응답 한번에 전부 작성하지 않아도 됩니다. 답변이 잘리더라도 다시 작성할 수 있습니다.
       2. 양식 : ${form}
-      3. 필요하다면 인터넷 검색 결과를 바탕으로 보고서를 작성해야 합니다.
-      4. 인터넷 검색 결과를 사용할 경우 마지막에 "참고문헌" 차례에 구체적인 참고문헌 url 링크를 첨부해야 합니다.
-      5. 에세이는 명확한 어휘를 사용하고, 설명하듯이 작성해야 합니다.
-      6. 아래 에세이 주제에 따라 작성하세요.
-      7. 본문은 축약형이 아닌 줄글, 서술형의 형태로 작성되어야 합니다.
-      8. 각각의 본론에 대해서 하위 항목이 2단계 이상 있으면 안됩니다.
+      3. 주어진 양식이 따로 없다면 적절한 양식으로 보고서를 작성해야합니다.
+      4. 필요하다면 인터넷 검색 결과를 바탕으로 보고서를 작성해야 합니다.
+      5. 인터넷 검색 결과를 사용할 경우 마지막에 "참고문헌" 차례에 구체적인 참고문헌 url 링크를 첨부해야 합니다.
+      6. 보고서의 제목을 선정해서 보고서 상단에 기입해야 합니다.
+      7. 아래 보고서 주제에 따라 작성하세요.
+      8. (!중요) 본문은 줄글 형태의 긴 문장들로 작성되어야 합니다. 하위 항목들을 나열하지 마세요!
+      9. 제목인 h1, 목차인 h2, 하위 목차인 h3 를 파악해서 #, ##, ### 를 앞에 붙여서 작성해야 합니다. ('#'을 4개 이상 붙이지 마세요!)
       </조건>
       
       <참고사항>
@@ -494,22 +525,28 @@ export class DocumentService {
       </지시문>
 
       <조건>
+      0. 실험보고서 주제에 따라 작성해야 합니다
       1. 분량은 반드시 ${amount}자 이상으로 작성해야 합니다.
       2. 실험보고서에는 아래와 같은 내용이 포함되어야 합니다
 	    <목차>
 	      ${elements}
 	    </목차>
-      3. 보고서는 html로 작성되어야 합니다.
-      4. 필요하다면 인터넷 검색 결과를 바탕으로 보고서를 작성해야 합니다.
-      5. 인터넷 검색 결과를 사용할 경우 마지막에 "참고문헌" 차례에 구체적인 참고문헌 url 링크를 첨부해야 합니다.
-      6. 보고서는 명확한 어휘를 사용해서 작성해야 합니다.
-      7. 아래 제시된 보고서의 핵심내용을 반드시 반영해야 합니다.
-      8. 첨부된 이미지나 도표를 적절한 위치에 인용해야 합니다.
-      9. 실험보고서 주제에 따라 작성해야 합니다
+      3. 필요하다면 인터넷 검색 결과를 바탕으로 보고서를 작성해야 합니다.
+      4. 인터넷 검색 결과를 사용할 경우 마지막에 "참고문헌" 차례에 구체적인 참고문헌 url 링크를 첨부해야 합니다.
+      5. 보고서는 명확한 어휘를 사용해서 작성해야 합니다.
+      6. 아래 제시된 보고서의 핵심내용을 반드시 반영해야 합니다.
+      7. 첨부된 이미지나 도표를 분석해서 분석 내용을 반영해서 실험 결과를 작성해야 합니다.
+      8. 첨부용 이미지(type="attachment"인 경우)는 사용되는 위치에 배치되어야 합니다.
+      9. 보고서는 관련 개념까지 확장 설명하며, 내용이 풍부해야 합니다.
+      10. 제목인 h1, 목차인 h2, 하위 목차인 h3 를 파악해서 #, ##, ### 를 앞에 붙여서 작성해야 합니다. ('#'을 4개 이상 붙이지 마세요!)
+      11. "-"를 통해 나열하듯이 쓰지 말고 한 소주제에 대해 한번에 긴 줄글로 작성해야 합니다.
+      12. 실험 결과(본문)와 분석은 분량이 엄청 많아야 합니다.
+      13. 보고서와 관련된 전공지식을 기반으로 정확한 내용을 작성해야 합니다.
       </조건>
 
       <첨부파일>
-      첨부파일을 사용할 때에는 본문 속에 <<파일명>>과 같이 작성해야 합니다. 아래는 사용가능한 파일 리스트와 파일의 내용들입니다.
+      첨부용 이미지를 사용할 때에는 본문 속에 <<{파일ID 값}>>과 같이 작성해야 합니다.
+      아래는 사용가능한 첨부용(attachment) 파일 리스트와 파일의 내용들입니다. 분석용(analysis) 파일은 본문에 사용하지 않아도 됩니다.
 
       ${files ? formatFiles(files) : '첨부파일이 없습니다.'}
 
@@ -525,7 +562,13 @@ export class DocumentService {
 
       <보고서 주제>
       ${title}
-      </보고서 주제>`;
+      </보고서 주제>
+
+      <관련된 전공지식>
+      ${retrieval}
+      </관련된 전공지식>
+
+      `;
     }
   }
 
@@ -536,7 +579,7 @@ export class DocumentService {
       id: documentId,
     });
 
-    const total_prompt = `${document.prompt} 다음 사용자와 질의응답을 고려해서 작성해주세요. \n${addPrompt}`;
+    const total_prompt = `${document.prompt} \n${addPrompt}`;
 
     document.prompt = total_prompt;
     return this.documentRepository.save(document);
@@ -549,13 +592,107 @@ export class DocumentService {
     if (!document) {
       throw new Error('Document not found');
     }
+
+    if(document.wordUrl) {
+      return document.wordUrl;
+    }
     const content: string = await this.downloadContentFromS3(document.url);
+
+    const paragraphs = await Promise.all(
+      content.split('\n').map(async (line) => {
+        const matches = line.match(/<<(\d+)>>/);
+        if (matches) {
+          const fileId = parseInt(matches[1], 10);
+          const file = await this.fileRepository.findOneBy({
+            id: fileId,
+          });
+          if (file && file.url) {
+            const imageBuffer = await this.downloadImageFromS3(file.url);
+            const dimensions = sizeOf(imageBuffer);
+
+            let width = dimensions.width;
+            let height = dimensions.height;
+
+            if (width > 300) {
+              const aspectRatio = width / height;
+              width = 300;
+              height = width / aspectRatio;
+            }
+
+            return new Paragraph({
+              children: [
+                new ImageRun({
+                  data: imageBuffer,
+                  transformation: {
+                    width: width,
+                    height: height,
+                  },
+                }),
+              ],
+            });
+          }
+        }
+
+        // 스타일 적용 예시
+        if (line.startsWith('# ')) {
+          return new Paragraph({
+            children: [
+              new TextRun({
+                text: line.replace('# ', ''),
+                bold: true,
+                size: 32,
+                color: '000000',
+              }),
+            ],
+            heading: HeadingLevel.HEADING_1,
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+          });
+        } else if (line.startsWith('## ')) {
+          return new Paragraph({
+            children: [
+              new TextRun({
+                text: line.replace('## ', ''),
+                bold: true,
+                size: 24,
+                color: '000000',
+              }),
+            ],
+            heading: HeadingLevel.HEADING_2,
+            spacing: { after: 100 },
+          });
+        } else if (line.startsWith('### ')) {
+          return new Paragraph({
+            children: [
+              new TextRun({
+                text: line.replace('### ', ''),
+                bold: true,
+                size: 20,
+                color: '000000',
+              }),
+            ],
+            heading: HeadingLevel.HEADING_3,
+            spacing: { after: 50 },
+          });
+        } else {
+          return new Paragraph({
+            children: [
+              new TextRun({
+                text: line,
+                color: '000000',
+              }),
+            ],
+          });
+        }
+      }),
+    );
 
     const doc = new WordDocument({
       sections: [
         {
           properties: {},
           children: content.split('\n').map((line) => new Paragraph(line)),
+          children: paragraphs,
         },
       ],
     });
@@ -563,7 +700,8 @@ export class DocumentService {
     const buffer = await Packer.toBuffer(doc);
 
     // Upload to S3
-    const fileName = `${document.title}-${uuidv4()}.docx`;
+    const shortFileName = document.title.substring(0, 10).replace(/\s/g, '-'); // 20글자로 제한
+    const fileName = `${shortFileName}-${uuidv4()}.docx`;
     const filePath = path.join('documents', fileName);
 
     const params = {
@@ -579,6 +717,61 @@ export class DocumentService {
       document.wordUrl = data.Location;
       await this.documentRepository.save(document);
       return document.wordUrl;
+    } catch (error) {
+      console.error('Error uploading file to S3:', error);
+      throw new Error('Error uploading file to S3');
+    }
+  }
+
+  async downloadContentFromS3(url: string): Promise<string> {
+    const parsedUrl = new URL(url);
+    const key = decodeURIComponent(parsedUrl.pathname.substring(1));
+
+    const params = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: key,
+    };
+
+    try {
+      const data = await this.s3.getObject(params).promise();
+      return data.Body.toString('utf-8');
+    } catch (error) {
+      console.error('Error downloading file from S3:', error);
+      throw new Error('Error downloading file from S3');
+    }
+  }
+  async downloadImageFromS3(url: string): Promise<Buffer> {
+    const parsedUrl = new URL(url);
+    const key = decodeURIComponent(parsedUrl.pathname.substring(1));
+
+    const params = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: key,
+    };
+
+    try {
+      const data = await this.s3.getObject(params).promise();
+      return data.Body as Buffer;
+    } catch (error) {
+      console.error('Error downloading image from S3:', error);
+      throw new Error('Error downloading image from S3');
+    }
+  }
+
+  async updateContentToS3(content: string, url: string): Promise<string> {
+    const parsedUrl = new URL(url);
+    const key = decodeURIComponent(parsedUrl.pathname.substring(1));
+
+    const params = {
+      Bucket: process.env.AWS_BUCKET_NAME,
+      Key: key,
+      Body: content,
+      ContentType: 'text/plain',
+    };
+
+    try {
+      const data = await this.s3.upload(params).promise();
+      return data.Location;
     } catch (error) {
       console.error('Error uploading file to S3:', error);
       throw new Error('Error uploading file to S3');

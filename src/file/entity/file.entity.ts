@@ -7,6 +7,9 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 
+// 파일 타입 정의 : 첨부용 / 분석용
+export type FileType = 'attachment' | 'analysis';
+
 @Entity()
 export class File {
   @PrimaryGeneratedColumn()
@@ -16,12 +19,15 @@ export class File {
   name: string;
 
   @Column()
+  type: FileType;
+
+  @Column()
   description: string;
 
   @Column({length: 5000})
   url: string;
 
-  @ManyToOne(() => Document, (document) => document.files)
+  @ManyToOne(() => Document, (document) => document.files, { onDelete: 'CASCADE' })
   @JoinColumn()
   document: Document;
 }

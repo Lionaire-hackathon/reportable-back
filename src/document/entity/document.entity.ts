@@ -55,6 +55,9 @@ export class Document {
   @Column({ default: 0 }) // default value 0 token으로 설정
   used_output_tokens: number;
 
+  @Column({ length: 5000})
+  retrieval?: string;
+
   @CreateDateColumn()
   created_at: Date;
 
@@ -65,7 +68,7 @@ export class Document {
   @JoinColumn()
   user: User;
 
-  @OneToMany(() => File, (file) => file.document, { cascade: true , eager: true})
+  @OneToMany(() => File, (file) => file.document, { cascade: true , eager: true, onDelete: 'CASCADE' })
   @JoinColumn()
   files: File[];
 }

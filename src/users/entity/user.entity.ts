@@ -40,11 +40,16 @@ export class User {
   @UpdateDateColumn()
   updated_at: Date;
 
-  @OneToOne(() => Identity)
+  @OneToOne(() => Identity, { cascade: true, onDelete: 'CASCADE', onUpdate: 'CASCADE' })
   @JoinColumn()
   identity: Identity;
 
-  @OneToMany(() => Document, (document) => document.user, { cascade: true, eager: true })
+  @OneToMany(() => Document, (document) => document.user, {
+    cascade: true,
+    onDelete: 'CASCADE',
+    eager: true,
+    onUpdate: 'CASCADE',
+  })
   @JoinColumn()
   documents: Document[];
 }
