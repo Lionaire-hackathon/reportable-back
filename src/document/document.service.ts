@@ -80,7 +80,7 @@ export class DocumentService {
     if (!user) {
       throw new Error('User not found');
     }
-
+    const retrieval = await this.SOME_RETRIEVAL_FUNCTION(core);
     const post = this.documentRepository.create({
       title,
       amount,
@@ -441,7 +441,7 @@ export class DocumentService {
   }
 
   async genPromptFromDoc(document: Document): Promise<string> {
-    const { type, title, prompt, amount, form, elements, core, files } =
+    const { type, title, prompt, amount, form, elements, core, files, retrieval } =
       document;
 
     const formatFiles = (files: File[]): string => {
@@ -511,7 +511,7 @@ export class DocumentService {
       10. 제목인 h1, 목차인 h2, 하위 목차인 h3 를 파악해서 #, ##, ### 를 앞에 붙여서 작성해야 합니다. ('#'을 4개 이상 붙이지 마세요!)
       11. "-"를 통해 나열하듯이 쓰지 말고 한 소주제에 대해 한번에 긴 줄글로 작성해야 합니다.
       12. 실험 결과(본문)와 분석은 분량이 엄청 많아야 합니다.
-
+      13. 보고서와 관련된 전공지식을 기반으로 정확한 내용을 작성해야 합니다.
       </조건>
 
       <첨부파일>
@@ -533,6 +533,10 @@ export class DocumentService {
       <보고서 주제>
       ${title}
       </보고서 주제>
+
+      <관련된 전공지식>
+      ${retrieval}
+      </관련된 전공지식>
 
       `;
     }
