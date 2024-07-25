@@ -13,11 +13,9 @@ import { classifyFiles, classifyImageType } from 'src/utils/file-utils';
 import { ClaudeImageApiObject } from './dto/claude-api-objects.dto';
 import axios from 'axios';
 import { EditPromptDto } from './dto/edit-prompt.dto';
+import { Document as WordDocument, Packer, Paragraph, TextRun } from 'docx';
+import { Pinecone } from '@pinecone-database/pinecone';
 import {
-  Document as WordDocument,
-  Packer,
-  Paragraph,
-  TextRun,
   ImageRun,
   HeadingLevel,
   AlignmentType,
@@ -26,7 +24,7 @@ import {
 } from 'docx';
 import sizeOf from 'image-size';
 import OpenAI from 'openai';
-import * as katex from 'katex';
+import * as fs from 'fs';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -67,6 +65,38 @@ export class DocumentService {
     private fileRepository: Repository<File>,
   ) {}
 
+
+  async queryrag(pinc: Pinecone, query: string) {
+    const pc = pinc;
+    const index = pc.index('reportable-vectordb');
+    // const jsonFilePath = path.join(__dirname, '..', 'document/id2text.json');
+    //const projectRoot = path.resolve(__dirname, '..', '..');
+    //const jsonFilePath = path.join(projectRoot, 'id2text.json');
+    const jsonData = JSON.parse(fs.readFileSync("/Users/seongil/likelion/hackarton/reportable-back/id2text.json", 'utf-8'));
+    const openai = new OpenAI({
+      apiKey: process.env.UPSTAGE_API_KEY,
+      baseURL: 'https://api.upstage.ai/v1/solar',
+    });
+    const embeddings = await openai.embeddings.create({
+      model: 'solar-embedding-1-large-query',
+      input: query,
+    });
+    const embedding = embeddings["data"][0]['embedding'];
+    const queryResponse = await index.namespace('default').query({
+      topK: 3,
+      vector: embedding,
+      includeValues: true,
+    });
+    const matches = queryResponse.matches;
+    let resultList: string[] = [];
+    for (let i = 0; i < 3; i++){
+      resultList.push(jsonData[matches[i]["id"]])
+    }
+    console.log(resultList[0])
+    let finalString = resultList.join(' ')
+    return finalString;
+  }
+
   async findOne(documentId: number): Promise<Document> {
     return this.documentRepository.findOneBy({ id: documentId });
   }
@@ -75,15 +105,22 @@ export class DocumentService {
     createDocumentDto: CreateDocumentDto,
     user_id: number,
   ): Promise<Document> {
+    
     const { title, amount, type, prompt, form, elements, core } =
       createDocumentDto;
 
     const user = await this.userRepository.findOneBy({ id: user_id });
-
+    const pc = new Pinecone({ apiKey:process.env.PINECONE_API_KEY });
+    let retrieval;
+    try {retrieval = await this.queryrag(pc, core);}
+    catch (error) {
+      console.log(error);
+    }
+  
     if (!user) {
       throw new Error('User not found');
     }
-
+    
     const post = this.documentRepository.create({
       title,
       amount,
@@ -93,6 +130,7 @@ export class DocumentService {
       elements,
       core,
       user,
+      retrieval,
     });
 
     return this.documentRepository.save(post);
@@ -486,7 +524,7 @@ export class DocumentService {
   }
 
   async genPromptFromDoc(document: Document): Promise<string> {
-    const { type, title, prompt, amount, form, elements, core, files } =
+    const { type, title, prompt, amount, form, elements, core, files, retrieval } =
       document;
 
     const formatFiles = (files: File[]): string => {
@@ -556,8 +594,7 @@ export class DocumentService {
       10. 제목인 h1, 목차인 h2, 하위 목차인 h3 를 파악해서 #, ##, ### 를 앞에 붙여서 작성해야 합니다. ('#'을 4개 이상 붙이지 마세요!)
       11. "-"를 통해 나열하듯이 쓰지 말고 한 소주제에 대해 한번에 긴 줄글로 작성해야 합니다.
       12. 실험 결과(본문)와 분석은 분량이 엄청 많아야 합니다.
-      
-
+      13. 보고서와 관련된 전공지식을 기반으로 정확한 내용을 작성해야 합니다.
       </조건>
 
       <첨부파일>
@@ -579,6 +616,10 @@ export class DocumentService {
       <보고서 주제>
       ${title}
       </보고서 주제>
+
+      <관련된 전공지식>
+      ${retrieval}
+      </관련된 전공지식>
 
       `;
     }
