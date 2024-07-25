@@ -58,9 +58,6 @@ export class Document {
   @Column({ default: 0 }) // default value 0 token으로 설정
   used_output_tokens: number;
 
-  @Column({ length: 3800})
-  retrieval: string;
-
   @CreateDateColumn()
   created_at: Date;
 
