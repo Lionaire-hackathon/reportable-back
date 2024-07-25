@@ -7,6 +7,7 @@ import { CreateDocumentDto } from './dto/create-document.dto';
 import * as AWS from 'aws-sdk';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
+import { Edit } from './entity/edit.entity';
 import { EditDocumentDto } from './dto/edit-document.dto';
 import { File } from 'src/file/entity/file.entity';
 import { classifyFiles, classifyImageType } from 'src/utils/file-utils';
@@ -15,15 +16,10 @@ import axios from 'axios';
 import { EditPromptDto } from './dto/edit-prompt.dto';
 import { Document as WordDocument, Packer, Paragraph, TextRun } from 'docx';
 import { Pinecone } from '@pinecone-database/pinecone';
-import {
-  ImageRun,
-  HeadingLevel,
-  AlignmentType,
-} from 'docx';
+import { ImageRun, HeadingLevel, AlignmentType } from 'docx';
 import sizeOf from 'image-size';
 import OpenAI from 'openai';
 import * as fs from 'fs';
-import { Edit } from './entity/edit.entity';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -66,14 +62,15 @@ export class DocumentService {
     private editRepository: Repository<Edit>,
   ) {}
 
-
   async queryrag(pinc: Pinecone, query: string) {
     const pc = pinc;
     const index = pc.index('reportable-vectordb');
     // const jsonFilePath = path.join(__dirname, '..', 'document/id2text.json');
     //const projectRoot = path.resolve(__dirname, '..', '..');
     //const jsonFilePath = path.join(projectRoot, 'id2text.json');
-    const jsonData = JSON.parse(fs.readFileSync("/Users/seongil/likelion/hackarton/reportable-back/id2text.json", 'utf-8'));
+    const jsonFilePath = path.join(process.cwd(), 'id2text.json');
+    console.log("jsonFilePath: ", jsonFilePath)
+    const jsonData = JSON.parse(fs.readFileSync(jsonFilePath, 'utf-8'));
     const openai = new OpenAI({
       apiKey: process.env.UPSTAGE_API_KEY,
       baseURL: 'https://api.upstage.ai/v1/solar',
@@ -82,7 +79,7 @@ export class DocumentService {
       model: 'solar-embedding-1-large-query',
       input: query,
     });
-    const embedding = embeddings["data"][0]['embedding'];
+    const embedding = embeddings['data'][0]['embedding'];
     const queryResponse = await index.namespace('default').query({
       topK: 3,
       vector: embedding,
@@ -90,11 +87,11 @@ export class DocumentService {
     });
     const matches = queryResponse.matches;
     let resultList: string[] = [];
-    for (let i = 0; i < 3; i++){
-      resultList.push(jsonData[matches[i]["id"]])
+    for (let i = 0; i < 3; i++) {
+      resultList.push(jsonData[matches[i]['id']]);
     }
-    console.log(resultList[0])
-    let finalString = resultList.join(' ')
+    console.log(resultList[0]);
+    let finalString = resultList.join(' ');
     return finalString;
   }
 
@@ -106,22 +103,22 @@ export class DocumentService {
     createDocumentDto: CreateDocumentDto,
     user_id: number,
   ): Promise<Document> {
-    
     const { title, amount, type, prompt, form, elements, core } =
       createDocumentDto;
 
     const user = await this.userRepository.findOneBy({ id: user_id });
-    const pc = new Pinecone({ apiKey:process.env.PINECONE_API_KEY });
-    let retrieval;
-    try {retrieval = await this.queryrag(pc, core);}
-    catch (error) {
+    const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+    let retrieval = '';
+    try {
+      retrieval = await this.queryrag(pc, core);
+    } catch (error) {
       console.log(error);
     }
-  
+    
     if (!user) {
       throw new Error('User not found');
     }
-    
+
     const post = this.documentRepository.create({
       title,
       amount,
@@ -429,11 +426,12 @@ export class DocumentService {
 
     const documentContent = await this.downloadContentFromS3(document.url);
 
-    const { exact_content_before, content_after, used_input_tokens, used_output_tokens } = await this.gptApiCall(
-      documentContent,
-      content_before,
-      prompt,
-    );
+    const {
+      exact_content_before,
+      content_after,
+      used_input_tokens,
+      used_output_tokens,
+    } = await this.gptApiCall(documentContent, content_before, prompt);
 
     const updatedContent = documentContent.replace(
       exact_content_before,
@@ -465,7 +463,12 @@ export class DocumentService {
     documentContent: string,
     content_before: string,
     prompt: string,
-  ): Promise<{ exact_content_before: string; content_after: string; used_input_tokens: number; used_output_tokens: number }> {
+  ): Promise<{
+    exact_content_before: string;
+    content_after: string;
+    used_input_tokens: number;
+    used_output_tokens: number;
+  }> {
     const messages: ChatCompletionMessageParam[] = [
       {
         role: 'system',
@@ -509,7 +512,12 @@ export class DocumentService {
       const { exact_content_before, content_after } = JSON.parse(response);
       const used_input_tokens = completion.usage.prompt_tokens;
       const used_output_tokens = completion.usage.completion_tokens;
-      return { exact_content_before, content_after, used_input_tokens, used_output_tokens };
+      return {
+        exact_content_before,
+        content_after,
+        used_input_tokens,
+        used_output_tokens,
+      };
     } catch (error) {
       console.error('Error during GPT API call:', error);
       throw new Error('Failed to generate the content using GPT API');
@@ -570,8 +578,17 @@ export class DocumentService {
   }
 
   async genPromptFromDoc(document: Document): Promise<string> {
-    const { type, title, prompt, amount, form, elements, core, files, retrieval } =
-      document;
+    const {
+      type,
+      title,
+      prompt,
+      amount,
+      form,
+      elements,
+      core,
+      files,
+      retrieval,
+    } = document;
 
     const formatFiles = (files: File[]): string => {
       return files
