@@ -10,6 +10,7 @@ import {
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
+import { Edit } from './edit.entity';
 
 // Type은 문서의 종류를 정의합니다.
 export enum Type {
@@ -71,4 +72,8 @@ export class Document {
   @OneToMany(() => File, (file) => file.document, { cascade: true , eager: true, onDelete: 'CASCADE' })
   @JoinColumn()
   files: File[];
+
+  @OneToMany(() => Edit, (edit) => edit.document, { cascade: true, eager: true, onDelete: 'CASCADE' })
+  @JoinColumn()
+  edits: Edit[];
 }

@@ -5,9 +5,10 @@ import { User } from 'src/users/entity/user.entity';
 import { Document } from './entity/document.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { File } from 'src/file/entity/file.entity';
+import { Edit } from './entity/edit.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Document, File])],
+  imports: [TypeOrmModule.forFeature([User, Document, File, Edit])],
   providers: [DocumentService],
   controllers: [DocumentController]
 })

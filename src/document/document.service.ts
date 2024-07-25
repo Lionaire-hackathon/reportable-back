@@ -19,12 +19,11 @@ import {
   ImageRun,
   HeadingLevel,
   AlignmentType,
-  MathRun,
-  Math,
 } from 'docx';
 import sizeOf from 'image-size';
 import OpenAI from 'openai';
 import * as fs from 'fs';
+import { Edit } from './entity/edit.entity';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -63,6 +62,8 @@ export class DocumentService {
     private userRepository: Repository<User>,
     @InjectRepository(File)
     private fileRepository: Repository<File>,
+    @InjectRepository(Edit)
+    private editRepository: Repository<Edit>,
   ) {}
 
 
@@ -409,45 +410,88 @@ export class DocumentService {
     }
   }
 
-  async edit(editDocumentDto: EditDocumentDto) {
+  async edit(editDocumentDto: EditDocumentDto, userId: number) {
     const { document_id, prompt, content_before } = editDocumentDto;
 
     const document = await this.documentRepository.findOne({
       where: { id: document_id },
     });
-    console.log(document);
-    const document_url = document.url;
-    const documentContent = await this.downloadContentFromS3(document_url);
+    if (!document) {
+      throw new Error('Document not found');
+    }
 
-    const content_after = await this.gptApiCall(
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    const documentContent = await this.downloadContentFromS3(document.url);
+
+    const { exact_content_before, content_after, used_input_tokens, used_output_tokens } = await this.gptApiCall(
       documentContent,
       content_before,
       prompt,
     );
+
     const updatedContent = documentContent.replace(
-      content_before,
+      exact_content_before,
       content_after,
     );
 
-    const s3Url = await this.updateContentToS3(updatedContent, document_url);
+    const s3Url = await this.updateContentToS3(updatedContent, document.url);
 
-    return s3Url;
+    // Create and save the Edit entity
+    const edit = new Edit();
+    edit.document = document;
+    edit.user = user;
+    edit.content_before = exact_content_before;
+    edit.content_after = content_after;
+    edit.prompt = prompt;
+    edit.used_input_tokens = used_input_tokens;
+    edit.used_output_tokens = used_output_tokens;
+
+    await this.editRepository.save(edit);
+
+    // Update the document URL
+    document.url = s3Url;
+    await this.documentRepository.save(document);
+
+    return { s3Url, editId: edit.id };
   }
 
   async gptApiCall(
     documentContent: string,
     content_before: string,
     prompt: string,
-  ): Promise<string> {
+  ): Promise<{ exact_content_before: string; content_after: string; used_input_tokens: number; used_output_tokens: number }> {
     const messages: ChatCompletionMessageParam[] = [
       {
         role: 'system',
-        content:
-          '당신은 문서 전체 내용을 기반으로, 수정해야할 부분을 받고 수정 요청사항을 반영하여 수정된 부분을 제공해야 합니다.',
+        content: `당신은 문서 편집 전문가입니다. 주어진 문서 내용에서 사용자가 제공한 텍스트와 가장 유사한 부분을 찾고, 
+        수정 요청 사항을 반영하여 해당 부분을 수정해야 합니다. 공백, 줄바꿈, 마크다운 기호(#) 등의 차이는 무시하고 
+        가장 유사한 내용을 찾아주세요.`,
       },
       {
         role: 'user',
-        content: `다음은 문서의 내용입니다: "${documentContent}"\n\n수정할 내용은 다음과 같습니다: "${content_before}"\n\n수정 요청 사항은 다음과 같습니다: "${prompt}"\n\n수정된 내용을 { "content_after": "수정된 내용" } 형태로 제공해주세요.`,
+        content: `다음은 문서의 전체 내용입니다:
+        "${documentContent}"
+
+        다음은 수정하고자 하는 내용입니다:
+        "${content_before}"
+
+        수정 요청 사항은 다음과 같습니다:
+        "${prompt}"
+
+        1. 먼저 문서 내용에서 수정하고자 하는 내용과 가장 유사한 부분을 찾아주세요. 문장 단위로 찾아서, 끊기면 안됩니다. 
+        2. 수정하고자 하는 내용을 통해 실제로 찾은 마크다운 기호(#)나 공백, 줄바꿈을 포함한 정확한 원본 내용을 제공해주세요.
+        3. 그 다음, 수정 요청 사항을 반영하여 해당 부분을 수정해주세요.
+        4. 결과를 다음과 같은 JSON 형식으로 제공해주세요:
+        {
+          "exact_content_before": "문서에서 실제로 찾은 원본 내용",
+          "content_after": "수정된 내용"
+        }`,
       },
     ];
 
@@ -462,8 +506,10 @@ export class DocumentService {
       if (!response) {
         throw new Error('GPT API response is empty');
       }
-      const content_after = JSON.parse(response).content_after;
-      return content_after;
+      const { exact_content_before, content_after } = JSON.parse(response);
+      const used_input_tokens = completion.usage.prompt_tokens;
+      const used_output_tokens = completion.usage.completion_tokens;
+      return { exact_content_before, content_after, used_input_tokens, used_output_tokens };
     } catch (error) {
       console.error('Error during GPT API call:', error);
       throw new Error('Failed to generate the content using GPT API');

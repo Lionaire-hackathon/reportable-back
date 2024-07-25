@@ -58,8 +58,8 @@ export class DocumentController {
   @ApiBearerAuth('JWT')
   @UseGuards(JwtGuard)
   @Patch('edit') // 문서의 내용을 프롬프트를 기반으로 수정합니다.
-  edit(@Body() editDocumentDto: EditDocumentDto) {
-    return this.documentService.edit(editDocumentDto);
+  edit(@Body() editDocumentDto: EditDocumentDto, @Req() req) {
+    return this.documentService.edit(editDocumentDto, req.user.userId);
   }
   
   @ApiBearerAuth('JWT')
