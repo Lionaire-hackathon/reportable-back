@@ -44,4 +44,10 @@ export class CreateDocumentDto {
     description: 'The core contents of research paper',
   })
   core?: string;
+
+  @ApiPropertyOptional({
+    example: "retrieval",
+    description: "output of the retriever",
+  })
+  retrieval?: string;
 }

@@ -15,18 +15,14 @@ import axios from 'axios';
 import { EditPromptDto } from './dto/edit-prompt.dto';
 import { Document as WordDocument, Packer, Paragraph, TextRun } from 'docx';
 import { Pinecone } from '@pinecone-database/pinecone';
-import { OpenAI } from 'openai';
 import {
-  Document as WordDocument,
-  Packer,
-  Paragraph,
-  TextRun,
   ImageRun,
   HeadingLevel,
   AlignmentType,
 } from 'docx';
 import sizeOf from 'image-size';
 import OpenAI from 'openai';
+import * as fs from 'fs';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -71,28 +67,33 @@ export class DocumentService {
   async queryrag(pinc: Pinecone, query: string) {
     const pc = pinc;
     const index = pc.index('reportable-vectordb');
-
-    // Get embeddings from OpenAI, upstage
+    // const jsonFilePath = path.join(__dirname, '..', 'document/id2text.json');
+    //const projectRoot = path.resolve(__dirname, '..', '..');
+    //const jsonFilePath = path.join(projectRoot, 'id2text.json');
+    const jsonData = JSON.parse(fs.readFileSync("/Users/seongil/likelion/hackarton/reportable-back/id2text.json", 'utf-8'));
     const openai = new OpenAI({
       apiKey: process.env.UPSTAGE_API_KEY,
       baseURL: 'https://api.upstage.ai/v1/solar',
     });
-
     const embeddings = await openai.embeddings.create({
       model: 'solar-embedding-1-large-query',
       input: query,
     });
-
-    const embedding = embeddings.data['embedding'];
-
-    // Get Query from Pinecone serviceless DB
+    const embedding = embeddings["data"][0]['embedding'];
     const queryResponse = await index.namespace('default').query({
       topK: 3,
       vector: embedding,
       includeValues: true,
     });
-
-    return queryResponse.matches;
+    const matches = queryResponse.matches;
+    let resultList: string[] = [];
+    for (let i = 0; i < 3; i++){
+      resultList.push(jsonData[matches[i]["id"]])
+    }
+    console.log(resultList[0])
+    let finalString = resultList.join(' ')
+    return finalString;
+  }
 
   async findOne(documentId: number): Promise<Document> {
     return this.documentRepository.findOneBy({ id: documentId });
@@ -102,15 +103,22 @@ export class DocumentService {
     createDocumentDto: CreateDocumentDto,
     user_id: number,
   ): Promise<Document> {
+    
     const { title, amount, type, prompt, form, elements, core } =
       createDocumentDto;
 
     const user = await this.userRepository.findOneBy({ id: user_id });
-
+    const pc = new Pinecone({ apiKey:process.env.PINECONE_API_KEY });
+    let retrieval;
+    try {retrieval = await this.queryrag(pc, core);}
+    catch (error) {
+      console.log(error);
+    }
+  
     if (!user) {
       throw new Error('User not found');
     }
-    const retrieval = await this.SOME_RETRIEVAL_FUNCTION(core);
+    
     const post = this.documentRepository.create({
       title,
       amount,
@@ -120,6 +128,7 @@ export class DocumentService {
       elements,
       core,
       user,
+      retrieval,
     });
 
     return this.documentRepository.save(post);
@@ -691,7 +700,7 @@ export class DocumentService {
       sections: [
         {
           properties: {},
-          children: content.split('\n').map((line) => new Paragraph(line)),
+          //children: content.split('\n').map((line) => new Paragraph(line)),
           children: paragraphs,
         },
       ],
