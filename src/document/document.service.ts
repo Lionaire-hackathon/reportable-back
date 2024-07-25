@@ -439,8 +439,50 @@ export class DocumentService {
     if (!document) {
       throw new Error('Document not found');
     }
+    const content: string = await this.downloadContentFromS3(document.url);
 
-    return this.downloadContentFromS3(document.url);
+    const paragraphs = await Promise.all(
+      content.split('\n').map(async (line) => {
+        const matches = line.match(/<<(\d+)>>/);
+        if (matches) {
+          const fileId = parseInt(matches[1], 10);
+          const file = await this.fileRepository.findOneBy({
+            id: fileId,
+          });
+          if (file && file.url) {
+            const imageBuffer = await this.downloadImageFromS3(file.url);
+            const dimensions = sizeOf(imageBuffer);
+
+            let width = dimensions.width;
+            let height = dimensions.height;
+
+            if (width > 300) {
+              const aspectRatio = width / height;
+              width = 300;
+              height = width / aspectRatio;
+            }
+
+            // 이미지 태그로 변환
+            return `<img src="${file.url}" width="${width}" height="${height}" />`;
+          }
+        }
+
+        // 스타일 적용 예시
+        if (line.startsWith('# ')) {
+          return `<h1 style="text-align: center; margin-bottom: 20px; font-size: 18pt; font-weight: bold; color: #000000;">${line.replace('# ', '')}</h1>`;
+        } else if (line.startsWith('## ')) {
+          return `<h2 style="margin-bottom: 10px; font-size: 14pt; font-weight: bold; color: #000000;">${line.replace('## ', '')}</h2>`;
+        } else if (line.startsWith('### ')) {
+          return `<h3 style="margin-bottom: 5px; font-size: 11pt; font-weight: bold; color: #000000;">${line.replace('### ', '')}</h3>`;
+        } else {
+          return `<p style="color: #000000 font-size: 11pt;">${line}</p>`;
+        }
+      }),
+    );
+
+    // 전체 내용을 하나의 문자열로 병합
+    const formattedContent = paragraphs.join('\n');
+    return formattedContent;
   }
 
   async genPromptFromDoc(document: Document): Promise<string> {
