@@ -13,6 +13,9 @@ import { classifyFiles, classifyImageType } from 'src/utils/file-utils';
 import { ClaudeImageApiObject } from './dto/claude-api-objects.dto';
 import axios from 'axios';
 import { EditPromptDto } from './dto/edit-prompt.dto';
+import { Document as WordDocument, Packer, Paragraph, TextRun } from 'docx';
+import { Pinecone } from '@pinecone-database/pinecone';
+import { OpenAI } from 'openai';
 import {
   Document as WordDocument,
   Packer,
@@ -63,6 +66,33 @@ export class DocumentService {
     @InjectRepository(File)
     private fileRepository: Repository<File>,
   ) {}
+
+
+  async queryrag(pinc: Pinecone, query: string) {
+    const pc = pinc;
+    const index = pc.index('reportable-vectordb');
+
+    // Get embeddings from OpenAI, upstage
+    const openai = new OpenAI({
+      apiKey: process.env.UPSTAGE_API_KEY,
+      baseURL: 'https://api.upstage.ai/v1/solar',
+    });
+
+    const embeddings = await openai.embeddings.create({
+      model: 'solar-embedding-1-large-query',
+      input: query,
+    });
+
+    const embedding = embeddings.data['embedding'];
+
+    // Get Query from Pinecone serviceless DB
+    const queryResponse = await index.namespace('default').query({
+      topK: 3,
+      vector: embedding,
+      includeValues: true,
+    });
+
+    return queryResponse.matches;
 
   async findOne(documentId: number): Promise<Document> {
     return this.documentRepository.findOneBy({ id: documentId });
@@ -661,6 +691,7 @@ export class DocumentService {
       sections: [
         {
           properties: {},
+          children: content.split('\n').map((line) => new Paragraph(line)),
           children: paragraphs,
         },
       ],
