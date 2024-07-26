@@ -1,5 +1,6 @@
 import { Identity } from 'src/auth/entity/identity.entity';
 import { Document } from 'src/document/entity/document.entity';
+import { Edit } from 'src/document/entity/edit.entity';
 import {
   Column,
   PrimaryGeneratedColumn,
@@ -52,4 +53,12 @@ export class User {
   })
   @JoinColumn()
   documents: Document[];
+
+  @OneToMany(() => Edit, (edit) => edit.user, {
+    cascade: true,
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  })
+  @JoinColumn()
+  edits: Edit[];
 }

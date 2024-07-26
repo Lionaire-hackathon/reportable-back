@@ -1,0 +1,1 @@
+{"version":3,"file":"edit-prompt.dto.js","sourceRoot":"","sources":["../../../../src/document/dto/edit-prompt.dto.ts"],"names":[],"mappings":";;;;;;;;;;;;AAAA,6CAAmE;AAEnE,MAAa,aAAa;CAYzB;AAZD,sCAYC;AAPC;IAJC,IAAA,qBAAW,EAAC;QACX,OAAO,EAAE,2BAA2B;QACpC,WAAW,EAAE,2BAA2B;KACzC,CAAC;;iDACiB;AAMnB;IAJC,IAAA,qBAAW,EAAC;QACX,OAAO,EAAE,iCAAiC;QAC1C,WAAW,EAAE,iCAAiC;KAC/C,CAAC;;gDACgB"}
