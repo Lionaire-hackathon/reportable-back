@@ -10,7 +10,7 @@ import * as path from 'path';
 import { Edit } from './entity/edit.entity';
 import { EditDocumentDto } from './dto/edit-document.dto';
 import { File } from 'src/file/entity/file.entity';
-import { classifyFiles, classifyImageType } from 'src/utils/file-utils';
+import { classifyFiles, classifyImageType, zip } from 'src/utils/file-utils';
 import { ClaudeImageApiObject } from './dto/claude-api-objects.dto';
 import axios from 'axios';
 import { EditPromptDto } from './dto/edit-prompt.dto';
@@ -21,6 +21,7 @@ import sizeOf from 'image-size';
 import OpenAI from 'openai';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
+import * as XLSX from 'xlsx';
 
 dotenv.config();
 
@@ -72,7 +73,6 @@ export class DocumentService {
     //const projectRoot = path.resolve(__dirname, '..', '..');
     //const jsonFilePath = path.join(projectRoot, 'id2text.json');
     const jsonFilePath = path.join(process.cwd(), 'id2text.json');
-    console.log('jsonFilePath: ', jsonFilePath);
     const jsonData = JSON.parse(fs.readFileSync(jsonFilePath, 'utf-8'));
     const openai = new OpenAI({
       apiKey: process.env.UPSTAGE_API_KEY,
@@ -93,7 +93,6 @@ export class DocumentService {
     for (let i = 0; i < 3; i++) {
       resultList.push(jsonData[matches[i]['id']]);
     }
-    console.log(resultList[0]);
     let finalString = resultList.join(' ');
     return finalString;
   }
@@ -304,10 +303,38 @@ export class DocumentService {
   }
 
   async fetchAndProcessTableData(urls: string[]): Promise<string[]> {
-    // URL 리스트를 받아서 각 URL의 테이블 데이터를 처리하여 반환
-    return null;
-  }
+    try {
+      const results = await Promise.all(urls.map(async (url) => {
+          try {
+              // URL로부터 엑셀 파일을 다운로드
+              const response = await axios.get(url, { responseType: 'arraybuffer' });
+              const data = new Uint8Array(response.data);
+              const workbook = XLSX.read(data, { type: 'array' });
 
+              // 첫 번째 시트를 가져옴
+              const sheetName = workbook.SheetNames[0];
+              const sheet = workbook.Sheets[sheetName];
+
+              // 시트를 JSON으로 변환
+              const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as string[][];
+
+              // 각 행을 " | "로 구분하여 텍스트로 변환
+              return jsonData.map(row => row.join(' | ')).join('\n');
+          } catch (error) {
+              console.error('Error fetching or converting Excel file from URL:', url, error);
+              throw error;
+          }
+      }));
+
+      // 각 결과를 하나의 텍스트로 합침
+      console.log('Table results:', results);
+      return results;
+  } catch (error) {
+      console.error('Error processing multiple Excel files:', error);
+      throw error;
+  }
+  }
+  
   async claudeApiCallWithFiles(
     document: Document,
     prompt: string,
@@ -320,7 +347,7 @@ export class DocumentService {
     };
 
     const { imageFiles, spreadsheetFiles } = classifyFiles(document.files);
-
+    console.log('spreadsheetFiles:', imageFiles);
     let images = [];
     try {
       images = await this.fetchImageData(imageFiles);
@@ -336,7 +363,8 @@ export class DocumentService {
     } catch (error) {
       console.error('Error fetching table data:', error);
     }
-
+    const tableNames = spreadsheetFiles.map((file) => file.name);
+    const tableDescriptions = spreadsheetFiles.map((file) => file.description);
     let combinedContent: Array<any> = []; // Start with the prompt
 
     try {
@@ -361,8 +389,39 @@ export class DocumentService {
     } catch (error) {
       console.error('Error processing image messages:', error);
     }
-
-    const data = {
+    try {
+    const zipped = zip(tableNames, tableDescriptions, tables);
+    let cnt = 0;
+    zipped.forEach(([name, desc, table]) => {
+      if (cnt == 0) {
+        combinedContent.push({
+          type: 'text',
+          text: '<도표>' + '테이블명: ' +  name + '\n' + '테이블 설명: ' +  desc + '\n' + table + '\n'
+        });
+        cnt++;
+      }
+      else if (cnt == (tableNames.length - 1)) {
+        combinedContent.push({
+          type: 'text',
+          text: '테이블명: ' +  name + '\n' + '테이블 설명: ' +  desc + '\n' + table + '\n' + '</도표>'
+        });
+        cnt++;
+      } else {
+        combinedContent.push({
+          type: 'text',
+          text: '테이블명: ' +  name + '\n' + '테이블 설명: ' +  desc + '\n' + table + '\n'
+        });
+        cnt++;
+      }
+    });
+    }
+    catch (error) {
+      console.error('Error processing table messages:', error);
+    };
+    console.log('combinedContent:', combinedContent);
+    let data = {};
+    try {
+    data = {
       model: 'claude-3-5-sonnet-20240620',
       max_tokens: 8192,
       messages: [
@@ -377,7 +436,9 @@ export class DocumentService {
           ],
         },
       ],
-    };
+    };} catch (error) {
+      console.error('Claude data input error: ', error);
+    }
 
     try {
       const response = await axios.post(
@@ -385,6 +446,7 @@ export class DocumentService {
         data,
         { headers },
       );
+      console.log("Reponse Success!");
       return response.data;
     } catch (error) {
       console.error('Error during Claude API call:', error);
@@ -681,7 +743,6 @@ export class DocumentService {
       12. 실험 결과(본문)와 분석은 분량이 엄청 많아야 합니다.
       13. 보고서와 관련된 전공지식을 기반으로 정확한 내용을 작성해야 합니다.
       </조건>
-
       <첨부파일>
       첨부용 이미지를 사용할 때에는 본문 속에 <<{파일ID 값}-{파일명}}>>과 같이 작성해야 합니다.
       아래는 사용가능한 첨부용(attachment) 파일 리스트와 파일의 내용들입니다. 분석용(analysis) 파일은 본문에 사용하지 않아도 됩니다.
