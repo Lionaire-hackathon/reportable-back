@@ -108,6 +108,7 @@ export class DocumentService {
 
     const user = await this.userRepository.findOneBy({ id: user_id });
     const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+
     let retrieval = '';
     try {
       retrieval = await this.queryrag(pc, core);
@@ -713,6 +714,7 @@ export class DocumentService {
     if (!document) {
       throw new Error('Document not found');
     }
+
     const content: string = await this.downloadContentFromS3(document.url);
 
     const docChildren = await Promise.all(

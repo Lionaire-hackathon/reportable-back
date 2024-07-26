@@ -1,6 +1,7 @@
 import {
   ConflictException,
   Injectable,
+  NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -8,22 +9,75 @@ import { Identity } from './entity/identity.entity';
 import { Repository } from 'typeorm';
 import { UsersService } from 'src/users/users.service';
 import { JwtService } from '@nestjs/jwt';
-import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import * as bcrypt from 'bcrypt';
 import { Response } from 'express';
 import { SignUpDto } from './dto/signup.dto';
 import { setLoginCookie, setLogoutCookie } from './auth.util';
 import { Role, User } from 'src/users/entity/user.entity';
 import { LoginDto } from './dto/login.dto';
+import { Verification } from './entity/verification.entity';
+import { EmailService } from 'src/email/email.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(Identity) // Identity 엔터티를 주입합니다.
     private identityRepository: Repository<Identity>, // Identity 레포지토리를 주입합니다.
+    @InjectRepository(Verification)
+    private verificationRepository: Repository<Verification>,
     private usersService: UsersService, // UsersService를 주입합니다.
     private jwtService: JwtService, // JwtService를 주입합니다.
+    private emailService: EmailService,
   ) {}
+
+  // 이메일 인증 요청
+  async sendVerificationCode(email: string) {
+    const verification_code = Math.floor(
+      100000 + Math.random() * 900000,
+    ).toString(); // Generate a 6-digit code
+    const current_time = new Date();
+    const expired_at = new Date(current_time.getTime() + 5 * 60000);
+    const is_verified = false;
+
+    // Verification 엔티티에 정보 저장
+    const verification = new Verification();
+    verification.email = email;
+    verification.verification_code = verification_code;
+    verification.expired_at = expired_at;
+    verification.is_verified = is_verified;
+
+    // 데이터베이스에 저장
+    await this.verificationRepository.save(verification);
+
+    await this.emailService.sendVerificationMail(email, verification_code);
+  }
+
+  // 이메일 인증 확인
+  async verifyEmail(email: string, code: string) {
+    // ## TODO: 가장 최신의 email entity 객체만 가져오도록 findone 할 수 있게 코드를 수정해줘 (중복 방지)
+    const verification: Verification =
+      await this.verificationRepository.findOne({
+        where: { email },
+        order: { expired_at: 'DESC' }, // expired_at를 기준으로 최신 항목 선택
+      });
+
+    if (!verification) {
+      throw new NotFoundException('Verification email not found');
+    }
+
+    if (verification.expired_at < new Date()) {
+      throw new UnauthorizedException('Verification code expired.');
+    }
+
+    if (verification.verification_code !== code) {
+      return false;
+    }
+
+    verification.is_verified = true;
+    await this.verificationRepository.save(verification);
+
+    return verification.is_verified;
+  }
 
   // 회원가입 요청을 처리합니다.
   async signup(res: Response, signUpDto: SignUpDto) {
@@ -77,9 +131,7 @@ export class AuthService {
     // 이메일 제공자를 통한 로그인만 가능합니다.
     if (identity.provider !== 'email') {
       console.log('이메일 제공자를 통한 로그인만 가능합니다.');
-      throw new ConflictException(
-        '이메일 제공자를 통한 로그인만 가능합니다.',
-      );
+      throw new ConflictException('이메일 제공자를 통한 로그인만 가능합니다.');
     }
 
     // 비밀번호가 일치하는지 확인합니다.
@@ -100,10 +152,10 @@ export class AuthService {
       sub: identity.user.id,
       role: identity.user.role,
     };
-    console.log(payload)
+    console.log(payload);
 
     // 토큰을 생성합니다.
-    const accessToken = this.jwtService.sign(payload, { expiresIn: "30m" });
+    const accessToken = this.jwtService.sign(payload, { expiresIn: '30m' });
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '30d' });
 
     // 사용자의 인증 정보를 업데이트합니다.
