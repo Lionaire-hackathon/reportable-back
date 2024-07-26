@@ -1,5 +1,17 @@
 import { File } from 'src/file/entity/file.entity';
 
+export function zip<T>(...arrays: T[][]): T[][] {
+  const minLength = Math.min(...arrays.map(arr => arr.length));
+  const zipped: T[][] = [];
+
+  for (let i = 0; i < minLength; i++) {
+      const row: T[] = arrays.map(arr => arr[i]);
+      zipped.push(row);
+  }
+
+  return zipped;
+}
+
 export function classifyFiles(files: File[]): { imageFiles: File[], spreadsheetFiles: File[] } {
   const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif'];
   const spreadsheetExtensions = ['.xlsx', '.xls', '.csv'];

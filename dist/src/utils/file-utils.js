@@ -1,10 +1,20 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.zip = zip;
 exports.classifyFiles = classifyFiles;
 exports.getFileExtension = getFileExtension;
 exports.isImageFile = isImageFile;
 exports.classifyImageType = classifyImageType;
 exports.isSpreadsheetFile = isSpreadsheetFile;
+function zip(...arrays) {
+    const minLength = Math.min(...arrays.map(arr => arr.length));
+    const zipped = [];
+    for (let i = 0; i < minLength; i++) {
+        const row = arrays.map(arr => arr[i]);
+        zipped.push(row);
+    }
+    return zipped;
+}
 function classifyFiles(files) {
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif'];
     const spreadsheetExtensions = ['.xlsx', '.xls', '.csv'];

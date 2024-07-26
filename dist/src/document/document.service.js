@@ -32,6 +32,7 @@ const docx_2 = require("docx");
 const image_size_1 = require("image-size");
 const openai_1 = require("openai");
 const fs = require("fs");
+const XLSX = require("xlsx");
 const openai = new openai_1.default({
     apiKey: process.env.OPENAI_API_KEY,
 });
@@ -52,7 +53,6 @@ let DocumentService = class DocumentService {
         const pc = pinc;
         const index = pc.index('reportable-vectordb');
         const jsonFilePath = path.join(process.cwd(), 'id2text.json');
-        console.log('jsonFilePath: ', jsonFilePath);
         const jsonData = JSON.parse(fs.readFileSync(jsonFilePath, 'utf-8'));
         const openai = new openai_1.default({
             apiKey: process.env.UPSTAGE_API_KEY,
@@ -73,7 +73,6 @@ let DocumentService = class DocumentService {
         for (let i = 0; i < 3; i++) {
             resultList.push(jsonData[matches[i]['id']]);
         }
-        console.log(resultList[0]);
         let finalString = resultList.join(' ');
         return finalString;
     }
@@ -166,6 +165,7 @@ let DocumentService = class DocumentService {
                 promptHistory[1]['content'] + continuedResponse.content[0].text;
         }
         const s3Url = await this.uploadContentToS3(textOutput, document.title);
+        console.log('s3Url:', s3Url);
         document.used_input_tokens += totalInputTokenCount;
         document.used_output_tokens += totalOutputTokenCount;
         document.url = s3Url;
@@ -231,7 +231,29 @@ let DocumentService = class DocumentService {
         return claudeImageLists;
     }
     async fetchAndProcessTableData(urls) {
-        return null;
+        try {
+            const results = await Promise.all(urls.map(async (url) => {
+                try {
+                    const response = await axios_1.default.get(url, { responseType: 'arraybuffer' });
+                    const data = new Uint8Array(response.data);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const sheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                    return jsonData.map(row => row.join(' | ')).join('\n');
+                }
+                catch (error) {
+                    console.error('Error fetching or converting Excel file from URL:', url, error);
+                    throw error;
+                }
+            }));
+            console.log('Table results:', results);
+            return results;
+        }
+        catch (error) {
+            console.error('Error processing multiple Excel files:', error);
+            throw error;
+        }
     }
     async claudeApiCallWithFiles(document, prompt) {
         const headers = {
@@ -241,6 +263,7 @@ let DocumentService = class DocumentService {
             'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15',
         };
         const { imageFiles, spreadsheetFiles } = (0, file_utils_1.classifyFiles)(document.files);
+        console.log('spreadsheetFiles:', imageFiles);
         let images = [];
         try {
             images = await this.fetchImageData(imageFiles);
@@ -255,6 +278,8 @@ let DocumentService = class DocumentService {
         catch (error) {
             console.error('Error fetching table data:', error);
         }
+        const tableNames = spreadsheetFiles.map((file) => file.name);
+        const tableDescriptions = spreadsheetFiles.map((file) => file.description);
         let combinedContent = [];
         try {
             images.forEach((image) => {
@@ -275,24 +300,63 @@ let DocumentService = class DocumentService {
         catch (error) {
             console.error('Error processing image messages:', error);
         }
-        const data = {
-            model: 'claude-3-5-sonnet-20240620',
-            max_tokens: 8192,
-            messages: [
-                {
-                    role: 'user',
-                    content: [
-                        ...combinedContent,
-                        {
-                            type: 'text',
-                            text: prompt,
-                        },
-                    ],
-                },
-            ],
-        };
+        try {
+            const zipped = (0, file_utils_1.zip)(tableNames, tableDescriptions, tables);
+            let cnt = 0;
+            zipped.forEach(([name, desc, table]) => {
+                if (cnt == 0) {
+                    combinedContent.push({
+                        type: 'text',
+                        text: '<도표>' + '테이블명: ' + name + '\n' + '테이블 설명: ' + desc + '\n' + table + '\n'
+                    });
+                    cnt++;
+                }
+                else if (cnt == (tableNames.length - 1)) {
+                    combinedContent.push({
+                        type: 'text',
+                        text: '테이블명: ' + name + '\n' + '테이블 설명: ' + desc + '\n' + table + '\n' + '</도표>'
+                    });
+                    cnt++;
+                }
+                else {
+                    combinedContent.push({
+                        type: 'text',
+                        text: '테이블명: ' + name + '\n' + '테이블 설명: ' + desc + '\n' + table + '\n'
+                    });
+                    cnt++;
+                }
+            });
+        }
+        catch (error) {
+            console.error('Error processing table messages:', error);
+        }
+        ;
+        console.log('combinedContent:', combinedContent);
+        let data = {};
+        try {
+            data = {
+                model: 'claude-3-5-sonnet-20240620',
+                max_tokens: 8192,
+                messages: [
+                    {
+                        role: 'user',
+                        content: [
+                            ...combinedContent,
+                            {
+                                type: 'text',
+                                text: prompt,
+                            },
+                        ],
+                    },
+                ],
+            };
+        }
+        catch (error) {
+            console.error('Claude data input error: ', error);
+        }
         try {
             const response = await axios_1.default.post('https://api.anthropic.com/v1/messages', data, { headers });
+            console.log("Reponse Success!");
             return response.data;
         }
         catch (error) {
@@ -521,7 +585,6 @@ let DocumentService = class DocumentService {
       12. 실험 결과(본문)와 분석은 분량이 엄청 많아야 합니다.
       13. 보고서와 관련된 전공지식을 기반으로 정확한 내용을 작성해야 합니다.
       </조건>
-
       <첨부파일>
       첨부용 이미지를 사용할 때에는 본문 속에 <<{파일ID 값}-{파일명}}>>과 같이 작성해야 합니다.
       아래는 사용가능한 첨부용(attachment) 파일 리스트와 파일의 내용들입니다. 분석용(analysis) 파일은 본문에 사용하지 않아도 됩니다.

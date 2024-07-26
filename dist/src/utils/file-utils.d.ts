@@ -1,4 +1,5 @@
 import { File } from 'src/file/entity/file.entity';
+export declare function zip<T>(...arrays: T[][]): T[][];
 export declare function classifyFiles(files: File[]): {
     imageFiles: File[];
     spreadsheetFiles: File[];
