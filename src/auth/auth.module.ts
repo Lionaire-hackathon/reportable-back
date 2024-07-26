@@ -9,18 +9,26 @@ import { UsersService } from 'src/users/users.service';
 import { JwtStrategy } from './strategy/jwt.strategy';
 import { GoogleStrategy } from './strategy/google.strategy';
 import * as dotenv from 'dotenv';
+import { EmailService } from 'src/email/email.service';
+import { Verification } from './entity/verification.entity';
 
 dotenv.config();
 
 @Module({
   // TypeOrmModule을 사용하여 Identity와 User 엔터티를 주입합니다.
   imports: [
-    TypeOrmModule.forFeature([Identity, User]),
+    TypeOrmModule.forFeature([Identity, User, Verification]),
     JwtModule.register({
       secret: process.env.JWT_SECRET,
     }),
   ],
-  providers: [AuthService, UsersService, JwtStrategy, GoogleStrategy],
+  providers: [
+    AuthService,
+    UsersService,
+    JwtStrategy,
+    GoogleStrategy,
+    EmailService,
+  ],
   controllers: [AuthController],
 })
 export class AuthModule {}

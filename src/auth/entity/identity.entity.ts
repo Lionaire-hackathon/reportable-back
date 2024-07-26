@@ -19,7 +19,7 @@ export class Identity {
   @Column({ nullable: true })
   password: string;
 
-  @Column({ nullable: true , length: 1000})
+  @Column({ nullable: true, length: 1000 })
   refreshToken?: string;
 
   @Column({ nullable: true })
