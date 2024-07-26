@@ -165,10 +165,10 @@ let DocumentService = class DocumentService {
             textOutput =
                 promptHistory[1]['content'] + continuedResponse.content[0].text;
         }
-        const s3Url = await this.uploadContentToS3(textOutput, document.title);
+        const cloudFrontUrl = await this.uploadContentToS3(textOutput, document.title);
         document.used_input_tokens += totalInputTokenCount;
         document.used_output_tokens += totalOutputTokenCount;
-        document.url = s3Url;
+        document.url = cloudFrontUrl;
         return this.documentRepository.save(document);
     }
     async claudeApiCallWithPromptHistory(document, promptHistory) {
@@ -301,7 +301,10 @@ let DocumentService = class DocumentService {
         }
     }
     async uploadContentToS3(content, title) {
-        const shortFileName = title.substring(0, 10).replace(/\s/g, '-');
+        const shortFileName = title
+            .substring(0, 10)
+            .replace(/\s/g, '-')
+            .replace(/[<>:"/\\|?*]/g, '');
         const fileName = `${shortFileName}-${(0, uuid_1.v4)()}.txt`;
         const filePath = path.join('documents', fileName);
         const params = {
@@ -336,10 +339,10 @@ let DocumentService = class DocumentService {
         const documentContent = await this.downloadContentFromS3(document.url);
         const { exact_content_before, content_after, used_input_tokens, used_output_tokens, } = await this.gptApiCall(documentContent, content_before, prompt);
         const updatedContent = documentContent.replace(exact_content_before, content_after);
-        console.log("exact_content_before: ", exact_content_before);
-        console.log("content_after: ", content_after);
+        console.log('exact_content_before: ', exact_content_before);
+        console.log('content_after: ', content_after);
         console.log('updatedContent: ', updatedContent);
-        const s3Url = await this.updateContentToS3(updatedContent, document.url);
+        const cloudFrontUrl = await this.updateContentToS3(updatedContent, document.url);
         const edit = new edit_entity_1.Edit();
         edit.document = document;
         edit.user = user;
@@ -349,10 +352,10 @@ let DocumentService = class DocumentService {
         edit.used_input_tokens = used_input_tokens;
         edit.used_output_tokens = used_output_tokens;
         await this.editRepository.save(edit);
-        document.url = s3Url;
+        document.url = cloudFrontUrl;
         await this.documentRepository.save(document);
         const updatedWordUrl = await this.getDocFile(document_id);
-        return { s3Url, wordUrl: updatedWordUrl, editId: edit.id };
+        return { cloudFrontUrl, wordUrl: updatedWordUrl, editId: edit.id };
     }
     async gptApiCall(documentContent, content_before, prompt) {
         const messages = [
@@ -417,6 +420,31 @@ let DocumentService = class DocumentService {
         }
         const content = await this.downloadContentFromS3(document.url);
         const paragraphs = await Promise.all(content.split('\n').map(async (line) => {
+            const imageMatches = line.match(/<<(\d+)-(.+?)>>/);
+            if (imageMatches) {
+                const fileId = parseInt(imageMatches[1], 10);
+                const fileName = imageMatches[2];
+                const file = await this.fileRepository.findOneBy({
+                    id: fileId,
+                });
+                if (file && file.url) {
+                    const imageBuffer = await this.downloadImageFromS3(file.url);
+                    const dimensions = (0, image_size_1.default)(imageBuffer);
+                    let width = dimensions.width;
+                    let height = dimensions.height;
+                    if (width > 300) {
+                        const aspectRatio = width / height;
+                        width = 300;
+                        height = width / aspectRatio;
+                    }
+                    return `
+              <div style="text-align: center;">
+                <img src="${file.url}" width="${width}" height="${height}" />
+                <p style="font-weight: bold; font-size: 24pt; color: #000000;">${fileName}</p>
+              </div>
+            `;
+                }
+            }
             const matches = line.match(/<<(\d+)>>/);
             if (matches) {
                 const fileId = parseInt(matches[1], 10);
@@ -446,7 +474,7 @@ let DocumentService = class DocumentService {
                 return `<h3 style="margin-bottom: 5px; font-size: 11pt; font-weight: bold; color: #000000;">${line.replace('### ', '')}</h3>`;
             }
             else {
-                return `<p style="color: #000000 font-size: 11pt;">${line}</p>`;
+                return `<p style="color: #000000; font-size: 11pt;">${line}</p>`;
             }
         }));
         const formattedContent = paragraphs.join('\n');
@@ -574,6 +602,7 @@ let DocumentService = class DocumentService {
                 const file = await this.fileRepository.findOneBy({
                     id: fileId,
                 });
+                console.log(`파일 url: ${file.url}`);
                 if (file && file.url) {
                     const imageBuffer = await this.downloadImageFromS3(file.url);
                     const dimensions = (0, image_size_1.default)(imageBuffer);
@@ -676,7 +705,10 @@ let DocumentService = class DocumentService {
             ],
         });
         const buffer = await docx_1.Packer.toBuffer(doc);
-        const shortFileName = document.title.substring(0, 10).replace(/\s/g, '-');
+        const shortFileName = document.title
+            .substring(0, 10)
+            .replace(/\s/g, '-')
+            .replace(/[<>:"/\\|?*]/g, '');
         const fileName = `${shortFileName}-${(0, uuid_1.v4)()}.docx`;
         const filePath = path.join('documents', fileName);
         const params = {
