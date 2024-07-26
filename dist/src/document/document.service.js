@@ -423,6 +423,31 @@ let DocumentService = class DocumentService {
         }
         const content = await this.downloadContentFromS3(document.url);
         const paragraphs = await Promise.all(content.split('\n').map(async (line) => {
+            const imageMatches = line.match(/<<(\d+)-(.+?)>>/);
+            if (imageMatches) {
+                const fileId = parseInt(imageMatches[1], 10);
+                const fileName = imageMatches[2];
+                const file = await this.fileRepository.findOneBy({
+                    id: fileId,
+                });
+                if (file && file.url) {
+                    const imageBuffer = await this.downloadImageFromS3(file.url);
+                    const dimensions = (0, image_size_1.default)(imageBuffer);
+                    let width = dimensions.width;
+                    let height = dimensions.height;
+                    if (width > 300) {
+                        const aspectRatio = width / height;
+                        width = 300;
+                        height = width / aspectRatio;
+                    }
+                    return `
+              <div style="text-align: center;">
+                <img src="${file.url}" width="${width}" height="${height}" />
+                <p style="font-weight: bold; font-size: 24pt; color: #000000;">${fileName}</p>
+              </div>
+            `;
+                }
+            }
             const matches = line.match(/<<(\d+)>>/);
             if (matches) {
                 const fileId = parseInt(matches[1], 10);
@@ -452,7 +477,7 @@ let DocumentService = class DocumentService {
                 return `<h3 style="margin-bottom: 5px; font-size: 11pt; font-weight: bold; color: #000000;">${line.replace('### ', '')}</h3>`;
             }
             else {
-                return `<p style="color: #000000 font-size: 11pt;">${line}</p>`;
+                return `<p style="color: #000000; font-size: 11pt;">${line}</p>`;
             }
         }));
         const formattedContent = paragraphs.join('\n');
@@ -580,6 +605,7 @@ let DocumentService = class DocumentService {
                 const file = await this.fileRepository.findOneBy({
                     id: fileId,
                 });
+                console.log(`파일 url: ${file.url}`);
                 if (file && file.url) {
                     const imageBuffer = await this.downloadImageFromS3(file.url);
                     const dimensions = (0, image_size_1.default)(imageBuffer);
