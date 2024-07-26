@@ -42,7 +42,7 @@ export declare class DocumentService {
     claudeApiCallWithFiles(document: Document, prompt: string): Promise<ClaudeApiResponse>;
     uploadContentToS3(content: string, title: string): Promise<string>;
     edit(editDocumentDto: EditDocumentDto, userId: number): Promise<{
-        s3Url: string;
+        cloudFrontUrl: string;
         wordUrl: string;
         editId: number;
     }>;

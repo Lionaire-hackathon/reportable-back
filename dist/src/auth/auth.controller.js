@@ -64,6 +64,7 @@ let AuthController = class AuthController {
         const { accessToken, refreshToken } = req.user;
         (0, auth_util_1.setLoginCookie)(res, accessToken, refreshToken);
         const FRONTEND_URL = process.env.ENV === 'production' ? process.env.FRONTEND_PROD_URL : process.env.FRONTEND_DEV_URL;
+        console.log('FRONTEND_URL: ', FRONTEND_URL);
         res.redirect(FRONTEND_URL);
     }
 };

@@ -32,6 +32,8 @@ const docx_2 = require("docx");
 const image_size_1 = require("image-size");
 const openai_1 = require("openai");
 const fs = require("fs");
+const dotenv = require("dotenv");
+dotenv.config();
 const openai = new openai_1.default({
     apiKey: process.env.OPENAI_API_KEY,
 });
@@ -165,10 +167,10 @@ let DocumentService = class DocumentService {
             textOutput =
                 promptHistory[1]['content'] + continuedResponse.content[0].text;
         }
-        const s3Url = await this.uploadContentToS3(textOutput, document.title);
+        const cloudFrontUrl = await this.uploadContentToS3(textOutput, document.title);
         document.used_input_tokens += totalInputTokenCount;
         document.used_output_tokens += totalOutputTokenCount;
-        document.url = s3Url;
+        document.url = cloudFrontUrl;
         return this.documentRepository.save(document);
     }
     async claudeApiCallWithPromptHistory(document, promptHistory) {
@@ -301,7 +303,10 @@ let DocumentService = class DocumentService {
         }
     }
     async uploadContentToS3(content, title) {
-        const shortFileName = title.substring(0, 10).replace(/\s/g, '-');
+        const shortFileName = title
+            .substring(0, 10)
+            .replace(/\s/g, '-')
+            .replace(/[<>:"/\\|?*]/g, '');
         const fileName = `${shortFileName}-${(0, uuid_1.v4)()}.txt`;
         const filePath = path.join('documents', fileName);
         const params = {
@@ -312,7 +317,8 @@ let DocumentService = class DocumentService {
         };
         try {
             const data = await this.s3.upload(params).promise();
-            return data.Location;
+            const cloudFrontUrl = data.Location.replace(process.env.S3_DOMAIN, process.env.CLOUDFRONT_DOMAIN);
+            return cloudFrontUrl;
         }
         catch (error) {
             console.error('Error uploading file to S3:', error);
@@ -336,10 +342,10 @@ let DocumentService = class DocumentService {
         const documentContent = await this.downloadContentFromS3(document.url);
         const { exact_content_before, content_after, used_input_tokens, used_output_tokens, } = await this.gptApiCall(documentContent, content_before, prompt);
         const updatedContent = documentContent.replace(exact_content_before, content_after);
-        console.log("exact_content_before: ", exact_content_before);
-        console.log("content_after: ", content_after);
+        console.log('exact_content_before: ', exact_content_before);
+        console.log('content_after: ', content_after);
         console.log('updatedContent: ', updatedContent);
-        const s3Url = await this.updateContentToS3(updatedContent, document.url);
+        const cloudFrontUrl = await this.updateContentToS3(updatedContent, document.url);
         const edit = new edit_entity_1.Edit();
         edit.document = document;
         edit.user = user;
@@ -349,10 +355,10 @@ let DocumentService = class DocumentService {
         edit.used_input_tokens = used_input_tokens;
         edit.used_output_tokens = used_output_tokens;
         await this.editRepository.save(edit);
-        document.url = s3Url;
+        document.url = cloudFrontUrl;
         await this.documentRepository.save(document);
         const updatedWordUrl = await this.getDocFile(document_id);
-        return { s3Url, wordUrl: updatedWordUrl, editId: edit.id };
+        return { cloudFrontUrl, wordUrl: updatedWordUrl, editId: edit.id };
     }
     async gptApiCall(documentContent, content_before, prompt) {
         const messages = [
@@ -676,7 +682,10 @@ let DocumentService = class DocumentService {
             ],
         });
         const buffer = await docx_1.Packer.toBuffer(doc);
-        const shortFileName = document.title.substring(0, 10).replace(/\s/g, '-');
+        const shortFileName = document.title
+            .substring(0, 10)
+            .replace(/\s/g, '-')
+            .replace(/[<>:"/\\|?*]/g, '');
         const fileName = `${shortFileName}-${(0, uuid_1.v4)()}.docx`;
         const filePath = path.join('documents', fileName);
         const params = {
@@ -687,7 +696,7 @@ let DocumentService = class DocumentService {
         };
         try {
             const data = await this.s3.upload(params).promise();
-            document.wordUrl = data.Location;
+            document.wordUrl = data.Location.replace(process.env.S3_DOMAIN, process.env.CLOUDFRONT_DOMAIN);
             await this.documentRepository.save(document);
             return document.wordUrl;
         }
@@ -739,7 +748,8 @@ let DocumentService = class DocumentService {
         };
         try {
             const data = await this.s3.upload(params).promise();
-            return data.Location;
+            const cloudFrontUrl = data.Location.replace(process.env.S3_DOMAIN, process.env.CLOUDFRONT_DOMAIN);
+            return cloudFrontUrl;
         }
         catch (error) {
             console.error('Error uploading file to S3:', error);
