@@ -6,5 +6,5 @@ export declare class FileService {
     private fileRepository;
     private documentRepository;
     constructor(fileRepository: Repository<File>, documentRepository: Repository<Document>);
-    create(createFileDto: CreateFileDto): Promise<File>;
+    uploadFile(file: Express.Multer.File, createFileDto: CreateFileDto): Promise<File>;
 }

@@ -18,23 +18,38 @@ const file_entity_1 = require("./entity/file.entity");
 const typeorm_1 = require("typeorm");
 const typeorm_2 = require("@nestjs/typeorm");
 const document_entity_1 = require("../document/entity/document.entity");
+const AWS = require("aws-sdk");
+const s3 = new AWS.S3({
+    accessKeyId: process.env.AWS_ACCESS_KEY,
+    secretAccessKey: process.env.AWS_SECRET_KEY,
+    region: process.env.AWS_REGION,
+});
 let FileService = class FileService {
     constructor(fileRepository, documentRepository) {
         this.fileRepository = fileRepository;
         this.documentRepository = documentRepository;
     }
-    async create(createFileDto) {
-        const { document_id, name, description, url, type } = createFileDto;
-        const document = await this.documentRepository.findOne({
-            where: { id: document_id },
-            relations: ['files'],
-        });
+    async uploadFile(file, createFileDto) {
+        const document = await this.documentRepository.findOneBy({ id: createFileDto.document_id });
         if (!document) {
             throw new common_1.NotFoundException('Document not found');
         }
-        const file = this.fileRepository.create({ name, description, url, document, type });
-        await this.fileRepository.save(file);
-        return file;
+        const uploadResult = await s3
+            .upload({
+            Bucket: process.env.AWS_BUCKET_NAME,
+            Key: "input/" + createFileDto.name,
+            Body: file.buffer,
+            ContentType: file.mimetype,
+        })
+            .promise();
+        const newFile = this.fileRepository.create({
+            name: createFileDto.name,
+            description: createFileDto.description,
+            type: createFileDto.type,
+            url: uploadResult.Location,
+            document,
+        });
+        return this.fileRepository.save(newFile);
     }
 };
 exports.FileService = FileService;

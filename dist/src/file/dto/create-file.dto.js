@@ -37,13 +37,6 @@ __decorate([
 ], CreateFileDto.prototype, "description", void 0);
 __decorate([
     (0, swagger_1.ApiProperty)({
-        example: 'The url of the file',
-        description: 'The title of the file',
-    }),
-    __metadata("design:type", String)
-], CreateFileDto.prototype, "url", void 0);
-__decorate([
-    (0, swagger_1.ApiProperty)({
         example: 'attachment',
         description: 'The type of the file',
     }),

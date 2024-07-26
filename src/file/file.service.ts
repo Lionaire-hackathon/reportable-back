@@ -4,6 +4,14 @@ import { Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
 import { CreateFileDto } from './dto/create-file.dto';
 import { Document } from 'src/document/entity/document.entity';
+import * as AWS from 'aws-sdk';
+import { create } from 'domain';
+
+const s3 = new AWS.S3({
+  accessKeyId: process.env.AWS_ACCESS_KEY,
+  secretAccessKey: process.env.AWS_SECRET_KEY,
+  region: process.env.AWS_REGION,
+});
 
 @Injectable()
 export class FileService {
@@ -14,25 +22,29 @@ export class FileService {
     private documentRepository: Repository<Document>,
   ) {}
 
-  async create(createFileDto: CreateFileDto) {
-    const { document_id, name, description, url, type } = createFileDto;
-
-    // Find the Document entity using the document_id
-    const document = await this.documentRepository.findOne({
-      where: { id: document_id },
-      relations: ['files'],
-    });
+  async uploadFile(file: Express.Multer.File, createFileDto: CreateFileDto): Promise<File> {
+    const document = await this.documentRepository.findOneBy({id: createFileDto.document_id});
     if (!document) {
       throw new NotFoundException('Document not found');
     }
 
-    // Create a new File entity and set its properties
-    const file = this.fileRepository.create({ name, description, url, document, type });
+    const uploadResult = await s3
+      .upload({
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: "input/" + createFileDto.name,
+        Body: file.buffer,
+        ContentType: file.mimetype,
+      })
+      .promise();
 
-    // Save the File entity using the repository
-    await this.fileRepository.save(file);
+    const newFile = this.fileRepository.create({
+      name: createFileDto.name,
+      description: createFileDto.description,
+      type: createFileDto.type,
+      url: uploadResult.Location,
+      document,
+    });
 
-    // Return the created File entity
-    return file;
+    return this.fileRepository.save(newFile);
   }
 }

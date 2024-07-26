@@ -14,25 +14,45 @@ var __param = (this && this.__param) || function (paramIndex, decorator) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FileController = void 0;
 const common_1 = require("@nestjs/common");
+const platform_express_1 = require("@nestjs/platform-express");
 const file_service_1 = require("./file.service");
 const create_file_dto_1 = require("./dto/create-file.dto");
+const swagger_1 = require("@nestjs/swagger");
 let FileController = class FileController {
     constructor(fileService) {
         this.fileService = fileService;
     }
-    create(createFileDto, req) {
-        return this.fileService.create(createFileDto);
+    async uploadFile(file, createFileDto) {
+        return this.fileService.uploadFile(file, createFileDto);
     }
 };
 exports.FileController = FileController;
 __decorate([
-    (0, common_1.Post)(),
-    __param(0, (0, common_1.Body)()),
-    __param(1, (0, common_1.Req)()),
+    (0, common_1.Post)('upload'),
+    (0, common_1.UseInterceptors)((0, platform_express_1.FileInterceptor)('file')),
+    (0, swagger_1.ApiConsumes)('multipart/form-data'),
+    (0, swagger_1.ApiBody)({
+        description: 'File to upload',
+        schema: {
+            type: 'object',
+            properties: {
+                document_id: { type: 'number' },
+                name: { type: 'string' },
+                description: { type: 'string' },
+                type: { type: 'string' },
+                file: {
+                    type: 'string',
+                    format: 'binary',
+                },
+            },
+        },
+    }),
+    __param(0, (0, common_1.UploadedFile)()),
+    __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [create_file_dto_1.CreateFileDto, Object]),
-    __metadata("design:returntype", void 0)
-], FileController.prototype, "create", null);
+    __metadata("design:paramtypes", [Object, create_file_dto_1.CreateFileDto]),
+    __metadata("design:returntype", Promise)
+], FileController.prototype, "uploadFile", null);
 exports.FileController = FileController = __decorate([
     (0, common_1.Controller)('file'),
     __metadata("design:paramtypes", [file_service_1.FileService])
