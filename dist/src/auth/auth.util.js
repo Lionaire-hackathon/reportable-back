@@ -5,8 +5,9 @@ const setLoginCookie = (res, accessToken, refreshToken) => {
     console.log('setLoginCookie environment: ', process.env.ENV);
     const sameSite = process.env.ENV === 'production' ? 'none' : 'strict';
     const secure = process.env.ENV === 'production' ? true : false;
+    const FRONTEND_DOMAIN = process.env.ENV === 'production' ? process.env.FRONTEND_PROD_DOMAIN : process.env.FRONTEND_DEV_DOMAIN;
     res.cookie('refreshToken', refreshToken, {
-        domain: process.env.FRONTEND_DOMAIN,
+        domain: FRONTEND_DOMAIN,
         path: '/',
         sameSite,
         secure,
@@ -15,7 +16,7 @@ const setLoginCookie = (res, accessToken, refreshToken) => {
     });
     res.cookie('accessToken', accessToken, {
         maxAge: 30 * 24 * 60 * 60 * 1000,
-        domain: process.env.FRONTEND_DOMAIN,
+        domain: FRONTEND_DOMAIN,
         path: '/',
         sameSite,
         secure,
@@ -27,15 +28,16 @@ const setLogoutCookie = (res) => {
     console.log('setLogoutCookie environment: ', process.env.ENV);
     const sameSite = process.env.ENV === 'production' ? 'none' : 'strict';
     const secure = process.env.ENV === 'production' ? true : false;
+    const FRONTEND_DOMAIN = process.env.ENV === 'production' ? process.env.FRONTEND_PROD_DOMAIN : process.env.FRONTEND_DEV_DOMAIN;
     res.clearCookie('refreshToken', {
-        domain: process.env.FRONTEND_DOMAIN,
+        domain: FRONTEND_DOMAIN,
         path: '/',
         sameSite,
         secure,
         httpOnly: true,
     });
     res.clearCookie('accessToken', {
-        domain: process.env.FRONTEND_DOMAIN,
+        domain: FRONTEND_DOMAIN,
         path: '/',
         sameSite,
         secure,

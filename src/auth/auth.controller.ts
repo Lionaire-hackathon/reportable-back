@@ -91,8 +91,9 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req, @Res() res) {
-    const { accessToken, refreshToken } = req.user;
-    setLoginCookie(res, accessToken, refreshToken);
-    res.redirect(process.env.FRONTEND_URL);
+      const { accessToken, refreshToken } = req.user;
+      setLoginCookie(res, accessToken, refreshToken);
+      const FRONTEND_URL = process.env.ENV === 'production' ? process.env.FRONTEND_PROD_URL : process.env.FRONTEND_DEV_URL;
+      res.redirect(FRONTEND_URL);
   }
 }

@@ -56,7 +56,8 @@ let AuthController = class AuthController {
     async googleAuthRedirect(req, res) {
         const { accessToken, refreshToken } = req.user;
         (0, auth_util_1.setLoginCookie)(res, accessToken, refreshToken);
-        res.redirect(process.env.FRONTEND_URL);
+        const FRONTEND_URL = process.env.ENV === 'production' ? process.env.FRONTEND_PROD_URL : process.env.FRONTEND_DEV_URL;
+        res.redirect(FRONTEND_URL);
     }
 };
 exports.AuthController = AuthController;
