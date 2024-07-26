@@ -32,6 +32,8 @@ const docx_2 = require("docx");
 const image_size_1 = require("image-size");
 const openai_1 = require("openai");
 const fs = require("fs");
+const dotenv = require("dotenv");
+dotenv.config();
 const openai = new openai_1.default({
     apiKey: process.env.OPENAI_API_KEY,
 });
@@ -315,7 +317,8 @@ let DocumentService = class DocumentService {
         };
         try {
             const data = await this.s3.upload(params).promise();
-            return data.Location;
+            const cloudFrontUrl = data.Location.replace(process.env.S3_DOMAIN, process.env.CLOUDFRONT_DOMAIN);
+            return cloudFrontUrl;
         }
         catch (error) {
             console.error('Error uploading file to S3:', error);
@@ -719,7 +722,7 @@ let DocumentService = class DocumentService {
         };
         try {
             const data = await this.s3.upload(params).promise();
-            document.wordUrl = data.Location;
+            document.wordUrl = data.Location.replace(process.env.S3_DOMAIN, process.env.CLOUDFRONT_DOMAIN);
             await this.documentRepository.save(document);
             return document.wordUrl;
         }
@@ -771,7 +774,8 @@ let DocumentService = class DocumentService {
         };
         try {
             const data = await this.s3.upload(params).promise();
-            return data.Location;
+            const cloudFrontUrl = data.Location.replace(process.env.S3_DOMAIN, process.env.CLOUDFRONT_DOMAIN);
+            return cloudFrontUrl;
         }
         catch (error) {
             console.error('Error uploading file to S3:', error);

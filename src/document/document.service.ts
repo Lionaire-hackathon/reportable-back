@@ -22,6 +22,8 @@ import OpenAI from 'openai';
 import * as fs from 'fs';
 import * as dotenv from 'dotenv';
 
+dotenv.config();
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
@@ -408,7 +410,11 @@ export class DocumentService {
 
     try {
       const data = await this.s3.upload(params).promise();
-      return data.Location;
+      const cloudFrontUrl = data.Location.replace(
+        process.env.S3_DOMAIN,
+        process.env.CLOUDFRONT_DOMAIN,
+      );
+      return cloudFrontUrl;
     } catch (error) {
       console.error('Error uploading file to S3:', error);
       throw new Error('Error uploading file to S3');
@@ -896,7 +902,10 @@ export class DocumentService {
 
     try {
       const data = await this.s3.upload(params).promise();
-      document.wordUrl = data.Location;
+      document.wordUrl = data.Location.replace(
+        process.env.S3_DOMAIN,
+        process.env.CLOUDFRONT_DOMAIN,
+      );
       await this.documentRepository.save(document);
       return document.wordUrl;
     } catch (error) {
@@ -953,7 +962,11 @@ export class DocumentService {
 
     try {
       const data = await this.s3.upload(params).promise();
-      return data.Location;
+      const cloudFrontUrl = data.Location.replace(
+        process.env.S3_DOMAIN,
+        process.env.CLOUDFRONT_DOMAIN,
+      );
+      return cloudFrontUrl;
     } catch (error) {
       console.error('Error uploading file to S3:', error);
       throw new Error('Error uploading file to S3');
