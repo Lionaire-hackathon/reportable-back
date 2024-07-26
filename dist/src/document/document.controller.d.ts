@@ -11,7 +11,7 @@ export declare class DocumentController {
     createContent(documentId: number): Promise<import("./entity/document.entity").Document>;
     firstPrompt(documentId: number): Promise<any>;
     edit(editDocumentDto: EditDocumentDto, req: any): Promise<{
-        s3Url: string;
+        cloudFrontUrl: string;
         wordUrl: string;
         editId: number;
     }>;
