@@ -20,6 +20,9 @@ import { ImageRun, HeadingLevel, AlignmentType } from 'docx';
 import sizeOf from 'image-size';
 import OpenAI from 'openai';
 import * as fs from 'fs';
+import * as dotenv from 'dotenv';
+
+dotenv.config();
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -204,10 +207,13 @@ export class DocumentService {
       textOutput =
         promptHistory[1]['content'] + continuedResponse.content[0].text;
     }
-    const s3Url = await this.uploadContentToS3(textOutput, document.title);
+    const cloudFrontUrl = await this.uploadContentToS3(
+      textOutput,
+      document.title,
+    );
     document.used_input_tokens += totalInputTokenCount;
     document.used_output_tokens += totalOutputTokenCount;
-    document.url = s3Url;
+    document.url = cloudFrontUrl;
     return this.documentRepository.save(document);
   }
 
@@ -388,7 +394,10 @@ export class DocumentService {
 
   async uploadContentToS3(content: string, title: string): Promise<string> {
     // 기존 파일 이름 생성 부분
-    const shortFileName = title.substring(0, 10).replace(/\s/g, '-'); // 20글자로 제한
+    const shortFileName = title
+      .substring(0, 10)
+      .replace(/\s/g, '-')
+      .replace(/[<>:"/\\|?*]/g, ''); // 20글자로 제한
     const fileName = `${shortFileName}-${uuidv4()}.txt`;
     const filePath = path.join('documents', fileName);
 
@@ -401,7 +410,11 @@ export class DocumentService {
 
     try {
       const data = await this.s3.upload(params).promise();
-      return data.Location;
+      const cloudFrontUrl = data.Location.replace(
+        process.env.S3_DOMAIN,
+        process.env.CLOUDFRONT_DOMAIN,
+      );
+      return cloudFrontUrl;
     } catch (error) {
       console.error('Error uploading file to S3:', error);
       throw new Error('Error uploading file to S3');
@@ -438,12 +451,15 @@ export class DocumentService {
       exact_content_before,
       content_after,
     );
-    console.log("exact_content_before: ", exact_content_before);
-    console.log("content_after: ", content_after);
+    console.log('exact_content_before: ', exact_content_before);
+    console.log('content_after: ', content_after);
 
     console.log('updatedContent: ', updatedContent);
 
-    const s3Url = await this.updateContentToS3(updatedContent, document.url);
+    const cloudFrontUrl = await this.updateContentToS3(
+      updatedContent,
+      document.url,
+    );
 
     // Create and save the Edit entity
     const edit = new Edit();
@@ -458,11 +474,11 @@ export class DocumentService {
     await this.editRepository.save(edit);
 
     // Update the document URL
-    document.url = s3Url;
+    document.url = cloudFrontUrl;
     await this.documentRepository.save(document);
     const updatedWordUrl = await this.getDocFile(document_id);
 
-    return { s3Url, wordUrl: updatedWordUrl, editId: edit.id };
+    return { cloudFrontUrl, wordUrl: updatedWordUrl, editId: edit.id };
   }
 
   async gptApiCall(
@@ -838,7 +854,10 @@ export class DocumentService {
     const buffer = await Packer.toBuffer(doc);
 
     // Upload to S3
-    const shortFileName = document.title.substring(0, 10).replace(/\s/g, '-');
+    const shortFileName = document.title
+      .substring(0, 10)
+      .replace(/\s/g, '-')
+      .replace(/[<>:"/\\|?*]/g, '');
     const fileName = `${shortFileName}-${uuidv4()}.docx`;
     const filePath = path.join('documents', fileName);
 
@@ -852,7 +871,10 @@ export class DocumentService {
 
     try {
       const data = await this.s3.upload(params).promise();
-      document.wordUrl = data.Location;
+      document.wordUrl = data.Location.replace(
+        process.env.S3_DOMAIN,
+        process.env.CLOUDFRONT_DOMAIN,
+      );
       await this.documentRepository.save(document);
       return document.wordUrl;
     } catch (error) {
@@ -909,7 +931,11 @@ export class DocumentService {
 
     try {
       const data = await this.s3.upload(params).promise();
-      return data.Location;
+      const cloudFrontUrl = data.Location.replace(
+        process.env.S3_DOMAIN,
+        process.env.CLOUDFRONT_DOMAIN,
+      );
+      return cloudFrontUrl;
     } catch (error) {
       console.error('Error uploading file to S3:', error);
       throw new Error('Error uploading file to S3');
