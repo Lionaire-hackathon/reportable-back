@@ -754,7 +754,9 @@ export class DocumentService {
       throw new Error('Document not found');
     }
 
+    console.log("before downloadContentFromS3");
     const content: string = await this.downloadContentFromS3(document.url);
+    console.log("after downloadContentFromS3", content);
 
     const docChildren = await Promise.all(
       content.split('\n').map(async (line) => {
