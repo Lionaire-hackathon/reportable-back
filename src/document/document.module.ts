@@ -6,10 +6,11 @@ import { Document } from './entity/document.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { File } from 'src/file/entity/file.entity';
 import { Edit } from './entity/edit.entity';
+import { ApiKeyService } from './api-key.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([User, Document, File, Edit])],
-  providers: [DocumentService],
+  providers: [DocumentService, ApiKeyService],
   controllers: [DocumentController]
 })
 export class DocumentModule {}

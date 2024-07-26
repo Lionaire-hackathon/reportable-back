@@ -15,13 +15,14 @@ const document_entity_1 = require("./entity/document.entity");
 const typeorm_1 = require("@nestjs/typeorm");
 const file_entity_1 = require("../file/entity/file.entity");
 const edit_entity_1 = require("./entity/edit.entity");
+const api_key_service_1 = require("./api-key.service");
 let DocumentModule = class DocumentModule {
 };
 exports.DocumentModule = DocumentModule;
 exports.DocumentModule = DocumentModule = __decorate([
     (0, common_1.Module)({
         imports: [typeorm_1.TypeOrmModule.forFeature([user_entity_1.User, document_entity_1.Document, file_entity_1.File, edit_entity_1.Edit])],
-        providers: [document_service_1.DocumentService],
+        providers: [document_service_1.DocumentService, api_key_service_1.ApiKeyService],
         controllers: [document_controller_1.DocumentController]
     })
 ], DocumentModule);
