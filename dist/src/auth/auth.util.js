@@ -3,7 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.setLogoutCookie = exports.setLoginCookie = void 0;
 const setLoginCookie = (res, accessToken, refreshToken) => {
     console.log('setLoginCookie environment: ', process.env.ENV);
-    const sameSite = process.env.ENV === 'production' ? 'none' : 'strict';
+    const sameSite = process.env.ENV === 'production' ? 'strict' : 'strict';
     const secure = process.env.ENV === 'production' ? true : false;
     const FRONTEND_DOMAIN = process.env.ENV === 'production' ? process.env.FRONTEND_PROD_DOMAIN : process.env.FRONTEND_DEV_DOMAIN;
     res.cookie('refreshToken', refreshToken, {

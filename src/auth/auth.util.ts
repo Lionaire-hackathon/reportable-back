@@ -8,7 +8,7 @@ export const setLoginCookie = (
 ) => {
   // 쿠키를 설정합니다.
   console.log('setLoginCookie environment: ', process.env.ENV);
-  const sameSite = process.env.ENV === 'production' ? 'none' : 'strict';
+  const sameSite = process.env.ENV === 'production' ? 'strict' : 'strict';
   const secure = process.env.ENV === 'production' ? true : false;
   const FRONTEND_DOMAIN = process.env.ENV === 'production' ? process.env.FRONTEND_PROD_DOMAIN : process.env.FRONTEND_DEV_DOMAIN;
   res.cookie('refreshToken', refreshToken, {
