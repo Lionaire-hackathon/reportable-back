@@ -6,11 +6,17 @@ import { Response } from 'express';
 import { SignUpDto } from './dto/signup.dto';
 import { User } from 'src/users/entity/user.entity';
 import { LoginDto } from './dto/login.dto';
+import { Verification } from './entity/verification.entity';
+import { EmailService } from 'src/email/email.service';
 export declare class AuthService {
     private identityRepository;
+    private verificationRepository;
     private usersService;
     private jwtService;
-    constructor(identityRepository: Repository<Identity>, usersService: UsersService, jwtService: JwtService);
+    private emailService;
+    constructor(identityRepository: Repository<Identity>, verificationRepository: Repository<Verification>, usersService: UsersService, jwtService: JwtService, emailService: EmailService);
+    sendVerificationCode(email: string): Promise<void>;
+    verifyEmail(email: string, code: string): Promise<false | Boolean>;
     signup(res: Response, signUpDto: SignUpDto): Promise<void>;
     login(res: Response, loginDto: LoginDto): Promise<void>;
     verifyUser(userId: number): Promise<User>;

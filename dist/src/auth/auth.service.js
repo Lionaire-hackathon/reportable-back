@@ -21,11 +21,46 @@ const users_service_1 = require("../users/users.service");
 const jwt_1 = require("@nestjs/jwt");
 const bcrypt = require("bcrypt");
 const auth_util_1 = require("./auth.util");
+const verification_entity_1 = require("./entity/verification.entity");
+const email_service_1 = require("../email/email.service");
 let AuthService = class AuthService {
-    constructor(identityRepository, usersService, jwtService) {
+    constructor(identityRepository, verificationRepository, usersService, jwtService, emailService) {
         this.identityRepository = identityRepository;
+        this.verificationRepository = verificationRepository;
         this.usersService = usersService;
         this.jwtService = jwtService;
+        this.emailService = emailService;
+    }
+    async sendVerificationCode(email) {
+        const verification_code = Math.floor(100000 + Math.random() * 900000).toString();
+        const current_time = new Date();
+        const expired_at = new Date(current_time.getTime() + 5 * 60000);
+        const is_verified = false;
+        const verification = new verification_entity_1.Verification();
+        verification.email = email;
+        verification.verification_code = verification_code;
+        verification.expired_at = expired_at;
+        verification.is_verified = is_verified;
+        await this.verificationRepository.save(verification);
+        await this.emailService.sendVerificationMail(email, verification_code);
+    }
+    async verifyEmail(email, code) {
+        const verification = await this.verificationRepository.findOne({
+            where: { email },
+            order: { expired_at: 'DESC' },
+        });
+        if (!verification) {
+            throw new common_1.NotFoundException('Verification email not found');
+        }
+        if (verification.expired_at < new Date()) {
+            throw new common_1.UnauthorizedException('Verification code expired.');
+        }
+        if (verification.verification_code !== code) {
+            return false;
+        }
+        verification.is_verified = true;
+        await this.verificationRepository.save(verification);
+        return verification.is_verified;
     }
     async signup(res, signUpDto) {
         const existingIdentity = await this.identityRepository.findOne({
@@ -73,7 +108,7 @@ let AuthService = class AuthService {
             role: identity.user.role,
         };
         console.log(payload);
-        const accessToken = this.jwtService.sign(payload, { expiresIn: "30m" });
+        const accessToken = this.jwtService.sign(payload, { expiresIn: '30m' });
         const refreshToken = this.jwtService.sign(payload, { expiresIn: '30d' });
         await this.identityRepository.update(identity.id, { refreshToken });
         (0, auth_util_1.setLoginCookie)(res, accessToken, refreshToken);
@@ -152,8 +187,11 @@ exports.AuthService = AuthService;
 exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(identity_entity_1.Identity)),
+    __param(1, (0, typeorm_1.InjectRepository)(verification_entity_1.Verification)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
+        typeorm_2.Repository,
         users_service_1.UsersService,
-        jwt_1.JwtService])
+        jwt_1.JwtService,
+        email_service_1.EmailService])
 ], AuthService);
 //# sourceMappingURL=auth.service.js.map

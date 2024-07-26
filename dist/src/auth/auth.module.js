@@ -18,6 +18,8 @@ const users_service_1 = require("../users/users.service");
 const jwt_strategy_1 = require("./strategy/jwt.strategy");
 const google_strategy_1 = require("./strategy/google.strategy");
 const dotenv = require("dotenv");
+const email_service_1 = require("../email/email.service");
+const verification_entity_1 = require("./entity/verification.entity");
 dotenv.config();
 let AuthModule = class AuthModule {
 };
@@ -25,12 +27,18 @@ exports.AuthModule = AuthModule;
 exports.AuthModule = AuthModule = __decorate([
     (0, common_1.Module)({
         imports: [
-            typeorm_1.TypeOrmModule.forFeature([identity_entity_1.Identity, user_entity_1.User]),
+            typeorm_1.TypeOrmModule.forFeature([identity_entity_1.Identity, user_entity_1.User, verification_entity_1.Verification]),
             jwt_1.JwtModule.register({
                 secret: process.env.JWT_SECRET,
             }),
         ],
-        providers: [auth_service_1.AuthService, users_service_1.UsersService, jwt_strategy_1.JwtStrategy, google_strategy_1.GoogleStrategy],
+        providers: [
+            auth_service_1.AuthService,
+            users_service_1.UsersService,
+            jwt_strategy_1.JwtStrategy,
+            google_strategy_1.GoogleStrategy,
+            email_service_1.EmailService,
+        ],
         controllers: [auth_controller_1.AuthController],
     })
 ], AuthModule);

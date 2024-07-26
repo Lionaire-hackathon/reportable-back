@@ -17,6 +17,7 @@ const document_module_1 = require("./document/document.module");
 const file_module_1 = require("./file/file.module");
 const dotenv = require("dotenv");
 const config_1 = require("@nestjs/config");
+const email_module_1 = require("./email/email.module");
 dotenv.config();
 let AppModule = class AppModule {
 };
@@ -39,6 +40,7 @@ exports.AppModule = AppModule = __decorate([
             users_module_1.UsersModule,
             document_module_1.DocumentModule,
             file_module_1.FileModule,
+            email_module_1.EmailModule,
         ],
         controllers: [app_controller_1.AppController],
         providers: [app_service_1.AppService],

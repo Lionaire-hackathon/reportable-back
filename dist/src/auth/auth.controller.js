@@ -21,6 +21,7 @@ const swagger_1 = require("@nestjs/swagger");
 const auth_util_1 = require("./auth.util");
 const jwt_guard_1 = require("./guard/jwt.guard");
 const passport_1 = require("@nestjs/passport");
+const verification_dto_1 = require("./dto/verification.dto");
 let AuthController = class AuthController {
     constructor(authService) {
         this.authService = authService;
@@ -30,6 +31,12 @@ let AuthController = class AuthController {
     }
     async login(loginDto, res) {
         return this.authService.login(res, loginDto);
+    }
+    async sendcode(verificationDto) {
+        return this.authService.sendVerificationCode(verificationDto.email);
+    }
+    async verifycode(verificationDto) {
+        return this.authService.verifyEmail(verificationDto.email, verificationDto.code);
     }
     async verify(req) {
         return this.authService.verifyUser(req.user.userId);
@@ -77,6 +84,20 @@ __decorate([
     __metadata("design:paramtypes", [login_dto_1.LoginDto, Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "login", null);
+__decorate([
+    (0, common_1.Post)('send-code'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [verification_dto_1.VerificationDto]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "sendcode", null);
+__decorate([
+    (0, common_1.Put)('verify-code'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [verification_dto_1.VerificationDto]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "verifycode", null);
 __decorate([
     (0, swagger_1.ApiBearerAuth)('JWT'),
     (0, common_1.UseGuards)(jwt_guard_1.JwtGuard),
