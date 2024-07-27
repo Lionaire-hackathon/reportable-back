@@ -61,11 +61,25 @@ let AuthController = class AuthController {
         return this.authService.logout(res);
     }
     async googleAuthRedirect(req, res) {
-        const { accessToken, refreshToken } = req.user;
-        (0, auth_util_1.setLoginCookie)(res, accessToken, refreshToken);
-        const FRONTEND_URL = process.env.ENV === 'production' ? process.env.FRONTEND_PROD_URL : process.env.FRONTEND_DEV_URL;
-        console.log('FRONTEND_URL: ', FRONTEND_URL);
-        res.redirect(FRONTEND_URL);
+        try {
+            if (!req.user) {
+                throw new Error('No user found in request');
+            }
+            const { accessToken, refreshToken } = req.user;
+            (0, auth_util_1.setLoginCookie)(res, accessToken, refreshToken);
+            console.log('process.env.ENV: ', process.env.ENV);
+            const FRONTEND_URL = process.env.ENV === 'production'
+                ? process.env.FRONTEND_PROD_URL
+                : process.env.FRONTEND_DEV_URL;
+            console.log('FRONTEND_URL: ', FRONTEND_URL);
+            res.redirect(FRONTEND_URL);
+        }
+        catch (error) {
+            console.error('Error in googleAuthRedirect: ', error.message);
+            res
+                .status(500)
+                .json({ message: 'Internal server error', error: error.message });
+        }
     }
 };
 exports.AuthController = AuthController;
