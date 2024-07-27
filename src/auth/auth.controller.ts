@@ -91,10 +91,23 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req, @Res() res) {
+    try {
+      // Check if req.user is properly set
+      if (!req.user) {
+        throw new Error('No user found in request');
+      }
+
       const { accessToken, refreshToken } = req.user;
+
+      // Your setLoginCookie function implementation here
       setLoginCookie(res, accessToken, refreshToken);
+
       const FRONTEND_URL = process.env.ENV === 'production' ? process.env.FRONTEND_PROD_URL : process.env.FRONTEND_DEV_URL;
       console.log('FRONTEND_URL: ', FRONTEND_URL);
       res.redirect(FRONTEND_URL);
+    } catch (error) {
+      console.error('Error in googleAuthRedirect: ', error.message);
+      res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
   }
 }
