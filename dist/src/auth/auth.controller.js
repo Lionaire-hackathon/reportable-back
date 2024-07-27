@@ -67,13 +67,18 @@ let AuthController = class AuthController {
             }
             const { accessToken, refreshToken } = req.user;
             (0, auth_util_1.setLoginCookie)(res, accessToken, refreshToken);
-            const FRONTEND_URL = process.env.ENV === 'production' ? process.env.FRONTEND_PROD_URL : process.env.FRONTEND_DEV_URL;
+            console.log('process.env.ENV: ', process.env.ENV);
+            const FRONTEND_URL = process.env.ENV === 'production'
+                ? process.env.FRONTEND_PROD_URL
+                : process.env.FRONTEND_DEV_URL;
             console.log('FRONTEND_URL: ', FRONTEND_URL);
             res.redirect(FRONTEND_URL);
         }
         catch (error) {
             console.error('Error in googleAuthRedirect: ', error.message);
-            res.status(500).json({ message: 'Internal server error', error: error.message });
+            res
+                .status(500)
+                .json({ message: 'Internal server error', error: error.message });
         }
     }
 };
