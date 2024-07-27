@@ -120,6 +120,11 @@ let AuthService = class AuthService {
         const accessToken = this.jwtService.sign(payload, { expiresIn: '30m' });
         const refreshToken = this.jwtService.sign(payload, { expiresIn: '30d' });
         await this.identityRepository.update(identity.id, { refreshToken });
+        console.log('Generated refreshToken:', refreshToken);
+        const updatedIdentity = await this.identityRepository.findOne({
+            where: { email: loginDto.email },
+        });
+        console.log('Stored refreshToken:', updatedIdentity.refreshToken);
         (0, auth_util_1.setLoginCookie)(res, accessToken, refreshToken);
         res.sendStatus(200);
     }

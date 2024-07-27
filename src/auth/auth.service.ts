@@ -174,8 +174,13 @@ export class AuthService {
     await this.identityRepository.update(identity.id, { refreshToken });
 
     // 로그인 쿠키를 설정합니다.
-    setLoginCookie(res, accessToken, refreshToken);
+    console.log('Generated refreshToken:', refreshToken);
+    const updatedIdentity = await this.identityRepository.findOne({
+      where: { email: loginDto.email },
+    });
+    console.log('Stored refreshToken:', updatedIdentity.refreshToken);
 
+    setLoginCookie(res, accessToken, refreshToken);
     res.sendStatus(200);
   }
 
