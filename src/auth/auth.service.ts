@@ -205,6 +205,7 @@ export class AuthService {
 
         if (!identity || identity.refreshToken !== token) {
             console.log('Invalid token or user not found');
+            setLogoutCookie(res);
             throw new UnauthorizedException('Invalid token');
         }
 
@@ -232,11 +233,11 @@ export class AuthService {
 
     // 사용자가 존재하지 않는다면 사용자를 생성합니다.
     if (!user) {
-      user = await this.usersService.createUser({
-        email: userPayload.email,
-        name: userPayload.name,
-        phone_number: '',
-      });
+        user = await this.usersService.createUser({
+            email: userPayload.email,
+            name: userPayload.name,
+            phone_number: '',
+        });
     }
 
     // 사용자의 정보를 토큰에 담습니다.
@@ -246,30 +247,35 @@ export class AuthService {
 
     // 사용자의 인증 정보를 찾습니다.
     let identity = await this.identityRepository.findOneBy({
-      email: userPayload.email,
+        email: userPayload.email,
     });
 
     // 사용자의 인증 정보가 존재하지 않는다면 생성합니다.
     if (!identity) {
-      // 사용자의 인증 정보를 생성합니다.
-      identity = this.identityRepository.create({
-        email: userPayload.email,
-        provider,
-        user,
-        refreshToken,
-      });
+        // 사용자의 인증 정보를 생성합니다.
+        identity = this.identityRepository.create({
+            email: userPayload.email,
+            provider,
+            user,
+            refreshToken,
+        });
 
-      // 사용자의 인증 정보를 저장합니다.
-      await this.identityRepository.save(identity);
+        // 사용자의 인증 정보를 저장합니다.
+        await this.identityRepository.save(identity);
     } else {
-      if (identity.provider !== provider) {
-        throw new UnauthorizedException('이미 존재하는 이메일입니다.');
-      } else {
-        await this.identityRepository.update(identity.id, { refreshToken });
-      }
+        if (identity.provider !== provider) {
+            throw new UnauthorizedException('이미 존재하는 이메일입니다.');
+        } else {
+            identity.refreshToken = refreshToken;
+            await this.identityRepository.save(identity);
+
+            // 디버깅을 위해 로그 추가
+            console.log('Updated refreshToken:', identity.refreshToken);
+        }
     }
 
-    // 토근을 반환합니다.
+    // 토큰을 반환합니다.
     return { accessToken, refreshToken };
-  }
+}
+
 }

@@ -142,6 +142,7 @@ let AuthService = class AuthService {
             });
             if (!identity || identity.refreshToken !== token) {
                 console.log('Invalid token or user not found');
+                (0, auth_util_1.setLogoutCookie)(res);
                 throw new common_1.UnauthorizedException('Invalid token');
             }
             const payload = { email: identity.email, sub: identity.user.id, role: identity.user.role };
@@ -186,7 +187,9 @@ let AuthService = class AuthService {
                 throw new common_1.UnauthorizedException('이미 존재하는 이메일입니다.');
             }
             else {
-                await this.identityRepository.update(identity.id, { refreshToken });
+                identity.refreshToken = refreshToken;
+                await this.identityRepository.save(identity);
+                console.log('Updated refreshToken:', identity.refreshToken);
             }
         }
         return { accessToken, refreshToken };
