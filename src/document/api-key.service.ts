@@ -1,11 +1,11 @@
-// api-key.service.ts
 import { Injectable } from '@nestjs/common';
-import { Queue } from 'queue-promise';
+// import Queue from 'queue-promise'; // 이 줄을 주석 처리합니다.
+const Queue = require('queue-promise'); // require 방식으로 Queue 가져오기
 
 @Injectable()
 export class ApiKeyService {
   private apiKeys: string[];
-  private queues: Map<string, Queue>;
+  private queues: Map<string, any>;
 
   constructor() {
     this.apiKeys = [

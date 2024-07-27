@@ -11,7 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ApiKeyService = void 0;
 const common_1 = require("@nestjs/common");
-const queue_promise_1 = require("queue-promise");
+const Queue = require('queue-promise');
 let ApiKeyService = class ApiKeyService {
     constructor() {
         this.apiKeys = [
@@ -22,7 +22,7 @@ let ApiKeyService = class ApiKeyService {
         ];
         this.queues = new Map();
         this.apiKeys.forEach(key => {
-            this.queues.set(key, new queue_promise_1.Queue({ concurrent: 1, interval: 1000 }));
+            this.queues.set(key, new Queue({ concurrent: 1, interval: 1000 }));
         });
     }
     async executeTask(task) {
