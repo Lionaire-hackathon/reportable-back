@@ -188,40 +188,32 @@ export class AuthService {
   // 토큰 갱신 요청을 처리합니다.
   async refreshToken(res: Response, token: string) {
     try {
-      // 토큰을 검증합니다.
-      const decoded = this.jwtService.verify(token);
+        console.log('Refreshing token:', token);
 
-      // 사용자의 인증 정보를 찾습니다.
-      const identity = await this.identityRepository.findOne({
-        where: {
-          user: {
-            id: decoded.sub,
-          },
-        },
-        relations: ['user'],
-      });
+        const decoded = this.jwtService.verify(token);
+        console.log('Decoded token:', decoded);
 
-      // 사용자의 인증 정보가 존재하지 않거나, 리프레시 토큰이 일치하지 않는다면 예외를 발생시킵니다.
-      if (!identity || identity.refreshToken !== token) {
-        throw new UnauthorizedException('Invalid token');
-      }
+        const identity = await this.identityRepository.findOne({
+            where: { user: { id: decoded.sub } },
+            relations: ['user'],
+        });
 
-      // 사용자의 정보를 토큰에 담습니다.
-      const payload = {
-        email: identity.email,
-        sub: identity.user.id,
-        role: identity.user.role,
-      };
-      const accessToken = this.jwtService.sign(payload, { expiresIn: '30m' });
+        if (!identity || identity.refreshToken !== token) {
+            console.log('Invalid token or user not found');
+            throw new UnauthorizedException('Invalid token');
+        }
 
-      // 로그인 쿠키를 설정합니다.
-      setLoginCookie(res, accessToken, token);
-      res.sendStatus(200);
+        const payload = { email: identity.email, sub: identity.user.id, role: identity.user.role };
+        const accessToken = this.jwtService.sign(payload, { expiresIn: '30m' });
+
+        setLoginCookie(res, accessToken, token);
+        res.sendStatus(200);
     } catch (error) {
-      console.log(error);
-      throw new UnauthorizedException('Invalid token');
+        console.log('Error during token refresh:', error);
+        throw new UnauthorizedException('Invalid token');
     }
-  }
+}
+
 
   // 로그아웃 요청을 처리합니다.
   async logout(res: Response) {

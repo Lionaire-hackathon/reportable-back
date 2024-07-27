@@ -128,29 +128,24 @@ let AuthService = class AuthService {
     }
     async refreshToken(res, token) {
         try {
+            console.log('Refreshing token:', token);
             const decoded = this.jwtService.verify(token);
+            console.log('Decoded token:', decoded);
             const identity = await this.identityRepository.findOne({
-                where: {
-                    user: {
-                        id: decoded.sub,
-                    },
-                },
+                where: { user: { id: decoded.sub } },
                 relations: ['user'],
             });
             if (!identity || identity.refreshToken !== token) {
+                console.log('Invalid token or user not found');
                 throw new common_1.UnauthorizedException('Invalid token');
             }
-            const payload = {
-                email: identity.email,
-                sub: identity.user.id,
-                role: identity.user.role,
-            };
+            const payload = { email: identity.email, sub: identity.user.id, role: identity.user.role };
             const accessToken = this.jwtService.sign(payload, { expiresIn: '30m' });
             (0, auth_util_1.setLoginCookie)(res, accessToken, token);
             res.sendStatus(200);
         }
         catch (error) {
-            console.log(error);
+            console.log('Error during token refresh:', error);
             throw new common_1.UnauthorizedException('Invalid token');
         }
     }
