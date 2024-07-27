@@ -32,7 +32,6 @@ const docx_2 = require("docx");
 const image_size_1 = require("image-size");
 const openai_1 = require("openai");
 const fs = require("fs");
-const api_key_service_1 = require("./api-key.service");
 const openai = new openai_1.default({
     apiKey: process.env.OPENAI_API_KEY,
 });
@@ -42,12 +41,11 @@ AWS.config.update({
     region: process.env.AWS_REGION,
 });
 let DocumentService = class DocumentService {
-    constructor(documentRepository, userRepository, fileRepository, editRepository, apiKeyService) {
+    constructor(documentRepository, userRepository, fileRepository, editRepository) {
         this.documentRepository = documentRepository;
         this.userRepository = userRepository;
         this.fileRepository = fileRepository;
         this.editRepository = editRepository;
-        this.apiKeyService = apiKeyService;
         this.s3 = new AWS.S3();
     }
     async queryrag(pinc, query) {
@@ -79,8 +77,18 @@ let DocumentService = class DocumentService {
         let finalString = resultList.join(' ');
         return finalString;
     }
-    async findOne(documentId) {
-        return this.documentRepository.findOneBy({ id: documentId });
+    async findOne(documentId, userId) {
+        if (!userId) {
+            throw new Error('User not found');
+        }
+        const user = await this.userRepository.findOneBy({ id: userId });
+        const document = await this.documentRepository.findOneBy({ id: documentId });
+        if (document.user !== user) {
+            throw new Error('Document not found');
+        }
+        else {
+            return document;
+        }
     }
     async create(createDocumentDto, user_id) {
         const { title, amount, type, prompt, form, elements, core } = createDocumentDto;
@@ -88,7 +96,7 @@ let DocumentService = class DocumentService {
         const pc = new pinecone_1.Pinecone({ apiKey: process.env.PINECONE_API_KEY });
         let retrieval = '';
         try {
-            retrieval = !core ? '' : await this.queryrag(pc, title);
+            retrieval = await this.queryrag(pc, core);
         }
         catch (error) {
             console.log(error);
@@ -125,12 +133,9 @@ let DocumentService = class DocumentService {
         if (!document) {
             throw new Error('Document not found');
         }
-        const task = async (apiKey) => {
-            return this.claudeApiCall(document, `에세이 주제 "${document.title}"에 대해 답변하기 위해서 내용과 관련해서 너가 모르는 정보나 사용자의 견해 등 추가적으로 받아야 할 정보가 있어? 있으면 
-        { "needMorePrompt" : 1, "prompt": ["질문1 내용", "질문2 내용",...]} 형태로 대답하고, 없으면 
-        { "needMorePrompt" : 0 } 으로 대답해 (중요!)대답은 반드시 JSON 형식이어야만 해`, apiKey);
-        };
-        const response = await this.apiKeyService.executeTask(task);
+        const response = await this.claudeApiCall(document, `에세이 주제 "${document.title}"에 대해 답변하기 위해서 내용과 관련해서 너가 모르는 정보나 사용자의 견해 등 추가적으로 받아야 할 정보가 있어? 있으면 
+      { "needMorePrompt" : 1, "prompt": ["질문1 내용", "질문2 내용",...]} 형태로 대답하고, 없으면 
+      { "needMorePrompt" : 0 } 으로 대답해 (중요!)대답은 반드시 JSON 형식이어야만 해`);
         return response;
     }
     async createContent(documentId) {
@@ -146,11 +151,9 @@ let DocumentService = class DocumentService {
         const prompt = await this.genPromptFromDoc(document);
         console.log(prompt);
         promptHistory.push({ role: 'user', content: prompt });
-        const response = await this.apiKeyService.executeTask(async (apiKey) => {
-            return document.type === 'essay'
-                ? await this.claudeApiCall(document, prompt, apiKey)
-                : await this.claudeApiCallWithFiles(document, prompt, apiKey);
-        });
+        const response = document.type === 'essay'
+            ? await this.claudeApiCall(document, prompt)
+            : await this.claudeApiCallWithFiles(document, prompt);
         totalInputTokenCount += response.usage.input_tokens;
         totalOutputTokenCount += response.usage.output_tokens;
         promptHistory.push({
@@ -166,9 +169,7 @@ let DocumentService = class DocumentService {
             console.log('response stop reason', response.stop_reason);
             console.log('prompt history', promptHistory);
             console.log('@@@Continuing the conversation...');
-            const continuedResponse = await this.apiKeyService.executeTask(async (apiKey) => {
-                return this.claudeApiCallWithPromptHistory(document, promptHistory, apiKey);
-            });
+            const continuedResponse = await this.claudeApiCallWithPromptHistory(document, promptHistory);
             totalInputTokenCount += continuedResponse.usage.input_tokens;
             totalOutputTokenCount += continuedResponse.usage.output_tokens;
             textOutput =
@@ -180,9 +181,9 @@ let DocumentService = class DocumentService {
         document.url = cloudFrontUrl;
         return this.documentRepository.save(document);
     }
-    async claudeApiCallWithPromptHistory(document, promptHistory, apiKey) {
+    async claudeApiCallWithPromptHistory(document, promptHistory) {
         const headers = {
-            'x-api-key': apiKey,
+            'x-api-key': process.env.ANTHROPIC_API_KEY,
             'Content-Type': 'application/json',
             'anthropic-version': '2023-06-01',
             'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15',
@@ -206,9 +207,9 @@ let DocumentService = class DocumentService {
             console.log('claude api call with prompt history', error);
         }
     }
-    async claudeApiCall(document, prompt, apiKey) {
+    async claudeApiCall(document, prompt) {
         const headers = {
-            'x-api-key': apiKey,
+            'x-api-key': process.env.ANTHROPIC_API_KEY,
             'Content-Type': 'application/json',
             'anthropic-version': '2023-06-01',
             'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15',
@@ -242,9 +243,9 @@ let DocumentService = class DocumentService {
     async fetchAndProcessTableData(urls) {
         return null;
     }
-    async claudeApiCallWithFiles(document, prompt, apiKey) {
+    async claudeApiCallWithFiles(document, prompt) {
         const headers = {
-            'x-api-key': apiKey,
+            'x-api-key': process.env.ANTHROPIC_API_KEY,
             'Content-Type': 'application/json',
             'anthropic-version': '2023-06-01',
             'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15',
@@ -800,7 +801,6 @@ exports.DocumentService = DocumentService = __decorate([
     __metadata("design:paramtypes", [typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,
-        typeorm_2.Repository,
-        api_key_service_1.ApiKeyService])
+        typeorm_2.Repository])
 ], DocumentService);
 //# sourceMappingURL=document.service.js.map

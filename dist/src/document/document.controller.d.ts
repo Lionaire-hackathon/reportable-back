@@ -5,7 +5,7 @@ import { EditPromptDto } from './dto/edit-prompt.dto';
 export declare class DocumentController {
     private readonly documentService;
     constructor(documentService: DocumentService);
-    findOne(documentId: number): Promise<import("./entity/document.entity").Document>;
+    findOne(documentId: number, req: any): Promise<import("./entity/document.entity").Document>;
     create(createDocumentDto: CreateDocumentDto, req: any): Promise<import("./entity/document.entity").Document>;
     deleteDocument(documentId: number): Promise<import("./entity/document.entity").Document>;
     createContent(documentId: number): Promise<import("./entity/document.entity").Document>;

@@ -20,7 +20,7 @@ import { ImageRun, HeadingLevel, AlignmentType } from 'docx';
 import sizeOf from 'image-size';
 import OpenAI from 'openai';
 import * as fs from 'fs';
-import { ApiKeyService } from './api-key.service';
+import * as dotenv from 'dotenv';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -61,7 +61,6 @@ export class DocumentService {
     private fileRepository: Repository<File>,
     @InjectRepository(Edit)
     private editRepository: Repository<Edit>,
-    private apiKeyService: ApiKeyService,
   ) {}
 
   async queryrag(pinc: Pinecone, query: string) {
@@ -97,8 +96,17 @@ export class DocumentService {
     return finalString;
   }
 
-  async findOne(documentId: number): Promise<Document> {
-    return this.documentRepository.findOneBy({ id: documentId });
+  async findOne(documentId: number, userId: number): Promise<Document> {
+    if (!userId) {
+      throw new Error('User not found');
+    }
+    const user = await this.userRepository.findOneBy({ id: userId });
+    const document = await this.documentRepository.findOneBy({ id: documentId });
+    if(document.user !== user) {
+      throw new Error('Document not found');
+    } else {
+      return document;
+    }
   }
 
   async create(
@@ -113,7 +121,7 @@ export class DocumentService {
 
     let retrieval = '';
     try {
-      retrieval = !core ? '' : await this.queryrag(pc, title);
+      retrieval = await this.queryrag(pc, core);
     } catch (error) {
       console.log(error);
     }
@@ -157,17 +165,12 @@ export class DocumentService {
       throw new Error('Document not found');
     }
 
-    const task = async (apiKey: string) => {
-      return this.claudeApiCall(
-        document,
-        `에세이 주제 "${document.title}"에 대해 답변하기 위해서 내용과 관련해서 너가 모르는 정보나 사용자의 견해 등 추가적으로 받아야 할 정보가 있어? 있으면 
-        { "needMorePrompt" : 1, "prompt": ["질문1 내용", "질문2 내용",...]} 형태로 대답하고, 없으면 
-        { "needMorePrompt" : 0 } 으로 대답해 (중요!)대답은 반드시 JSON 형식이어야만 해`,
-        apiKey,
-      );
-    };
-
-    const response = await this.apiKeyService.executeTask(task);
+    const response = await this.claudeApiCall(
+      document,
+      `에세이 주제 "${document.title}"에 대해 답변하기 위해서 내용과 관련해서 너가 모르는 정보나 사용자의 견해 등 추가적으로 받아야 할 정보가 있어? 있으면 
+      { "needMorePrompt" : 1, "prompt": ["질문1 내용", "질문2 내용",...]} 형태로 대답하고, 없으면 
+      { "needMorePrompt" : 0 } 으로 대답해 (중요!)대답은 반드시 JSON 형식이어야만 해`,
+    );
 
     return response;
   }
@@ -186,11 +189,10 @@ export class DocumentService {
     console.log(prompt);
 
     promptHistory.push({ role: 'user', content: prompt });
-    const response = await this.apiKeyService.executeTask(async (apiKey) => {
-      return document.type === 'essay'
-        ? await this.claudeApiCall(document, prompt, apiKey)
-        : await this.claudeApiCallWithFiles(document, prompt, apiKey);
-    });
+    const response: ClaudeApiResponse =
+      document.type === 'essay'
+        ? await this.claudeApiCall(document, prompt)
+        : await this.claudeApiCallWithFiles(document, prompt);
     totalInputTokenCount += response.usage.input_tokens;
     totalOutputTokenCount += response.usage.output_tokens;
     promptHistory.push({
@@ -205,15 +207,8 @@ export class DocumentService {
       console.log('response stop reason', response.stop_reason);
       console.log('prompt history', promptHistory);
       console.log('@@@Continuing the conversation...');
-      const continuedResponse = await this.apiKeyService.executeTask(
-        async (apiKey) => {
-          return this.claudeApiCallWithPromptHistory(
-            document,
-            promptHistory,
-            apiKey,
-          );
-        },
-      );
+      const continuedResponse: ClaudeApiResponse =
+        await this.claudeApiCallWithPromptHistory(document, promptHistory);
       totalInputTokenCount += continuedResponse.usage.input_tokens;
       totalOutputTokenCount += continuedResponse.usage.output_tokens;
       textOutput =
@@ -232,10 +227,9 @@ export class DocumentService {
   async claudeApiCallWithPromptHistory(
     document: Document,
     promptHistory: PromptHistory[],
-    apiKey: string,
   ): Promise<ClaudeApiResponse> {
     const headers = {
-      'x-api-key': apiKey,
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
       'Content-Type': 'application/json',
       'anthropic-version': '2023-06-01',
       'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15',
@@ -267,10 +261,9 @@ export class DocumentService {
   async claudeApiCall(
     document: Document,
     prompt: string,
-    apiKey: string,
   ): Promise<ClaudeApiResponse> {
     const headers = {
-      'x-api-key': apiKey,
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
       'Content-Type': 'application/json',
       'anthropic-version': '2023-06-01',
       'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15',
@@ -325,10 +318,9 @@ export class DocumentService {
   async claudeApiCallWithFiles(
     document: Document,
     prompt: string,
-    apiKey: string,
   ): Promise<ClaudeApiResponse> {
     const headers = {
-      'x-api-key': apiKey,
+      'x-api-key': process.env.ANTHROPIC_API_KEY,
       'Content-Type': 'application/json',
       'anthropic-version': '2023-06-01',
       'anthropic-beta': 'max-tokens-3-5-sonnet-2024-07-15',

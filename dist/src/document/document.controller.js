@@ -24,8 +24,8 @@ let DocumentController = class DocumentController {
     constructor(documentService) {
         this.documentService = documentService;
     }
-    findOne(documentId) {
-        return this.documentService.findOne(documentId);
+    findOne(documentId, req) {
+        return this.documentService.findOne(documentId, req.user.userId);
     }
     create(createDocumentDto, req) {
         return this.documentService.create(createDocumentDto, req.user.userId);
@@ -58,8 +58,9 @@ __decorate([
     (0, common_1.UseGuards)(jwt_guard_1.JwtGuard),
     (0, common_1.Get)('/:id'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", void 0)
 ], DocumentController.prototype, "findOne", null);
 __decorate([

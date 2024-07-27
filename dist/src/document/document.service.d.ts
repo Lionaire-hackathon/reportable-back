@@ -8,7 +8,6 @@ import { File } from 'src/file/entity/file.entity';
 import { ClaudeImageApiObject } from './dto/claude-api-objects.dto';
 import { EditPromptDto } from './dto/edit-prompt.dto';
 import { Pinecone } from '@pinecone-database/pinecone';
-import { ApiKeyService } from './api-key.service';
 interface PromptHistory {
     role: string;
     content: string;
@@ -28,20 +27,19 @@ export declare class DocumentService {
     private userRepository;
     private fileRepository;
     private editRepository;
-    private apiKeyService;
     private s3;
-    constructor(documentRepository: Repository<Document>, userRepository: Repository<User>, fileRepository: Repository<File>, editRepository: Repository<Edit>, apiKeyService: ApiKeyService);
+    constructor(documentRepository: Repository<Document>, userRepository: Repository<User>, fileRepository: Repository<File>, editRepository: Repository<Edit>);
     queryrag(pinc: Pinecone, query: string): Promise<string>;
-    findOne(documentId: number): Promise<Document>;
+    findOne(documentId: number, userId: number): Promise<Document>;
     create(createDocumentDto: CreateDocumentDto, user_id: number): Promise<Document>;
     deleteDocument(documentId: number): Promise<Document>;
     firstPrompt(documentId: number): Promise<any>;
     createContent(documentId: number): Promise<Document>;
-    claudeApiCallWithPromptHistory(document: Document, promptHistory: PromptHistory[], apiKey: string): Promise<ClaudeApiResponse>;
-    claudeApiCall(document: Document, prompt: string, apiKey: string): Promise<ClaudeApiResponse>;
+    claudeApiCallWithPromptHistory(document: Document, promptHistory: PromptHistory[]): Promise<ClaudeApiResponse>;
+    claudeApiCall(document: Document, prompt: string): Promise<ClaudeApiResponse>;
     fetchImageData(imageFiles: File[]): Promise<ClaudeImageApiObject[]>;
     fetchAndProcessTableData(urls: string[]): Promise<string[]>;
-    claudeApiCallWithFiles(document: Document, prompt: string, apiKey: string): Promise<ClaudeApiResponse>;
+    claudeApiCallWithFiles(document: Document, prompt: string): Promise<ClaudeApiResponse>;
     uploadContentToS3(content: string, title: string): Promise<string>;
     edit(editDocumentDto: EditDocumentDto, userId: number): Promise<{
         cloudFrontUrl: string;
