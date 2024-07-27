@@ -82,7 +82,16 @@ let AuthService = class AuthService {
             provider: 'email',
         });
         await this.identityRepository.save(identity);
-        res.sendStatus(200);
+        const verification = await this.verificationRepository.findOne({
+            where: { email: signUpDto.email },
+            order: { expired_at: 'DESC' },
+        });
+        if (!verification.is_verified) {
+            throw new common_1.UnauthorizedException('Email is not verified');
+        }
+        else {
+            res.sendStatus(200);
+        }
     }
     async login(res, loginDto) {
         const identity = await this.identityRepository.findOne({

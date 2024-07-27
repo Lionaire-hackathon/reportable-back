@@ -111,7 +111,19 @@ export class AuthService {
 
     // 사용자의 인증 정보를 저장합니다.
     await this.identityRepository.save(identity);
-    res.sendStatus(200);
+
+    //verification entity에서 해당 이메일의 인증 정보를 가져와서 is_verified가 true인지 확인
+    const verification: Verification =
+      await this.verificationRepository.findOne({
+        where: { email: signUpDto.email },
+        order: { expired_at: 'DESC' }, // expired_at를 기준으로 최신 항목 선택
+      });
+
+    if (!verification.is_verified) {
+      throw new UnauthorizedException('Email is not verified');
+    } else {
+      res.sendStatus(200);
+    }
   }
 
   // 로그인 요청을 처리합니다.

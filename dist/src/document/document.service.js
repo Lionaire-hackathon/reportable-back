@@ -641,8 +641,8 @@ let DocumentService = class DocumentService {
                             children: [
                                 new docx_1.TextRun({
                                     text: fileName,
-                                    bold: true,
-                                    size: 24,
+                                    bold: false,
+                                    size: 15,
                                     color: '000000',
                                 }),
                             ],
