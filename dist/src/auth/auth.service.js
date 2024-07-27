@@ -140,6 +140,7 @@ let AuthService = class AuthService {
                 where: { user: { id: decoded.sub } },
                 relations: ['user'],
             });
+            console.log('Identity.refreshToken:', identity.refreshToken);
             if (!identity || identity.refreshToken !== token) {
                 console.log('Invalid token or user not found');
                 (0, auth_util_1.setLogoutCookie)(res);

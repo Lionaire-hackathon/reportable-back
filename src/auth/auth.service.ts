@@ -203,6 +203,8 @@ export class AuthService {
             relations: ['user'],
         });
 
+        console.log('Identity.refreshToken:', identity.refreshToken);
+
         if (!identity || identity.refreshToken !== token) {
             console.log('Invalid token or user not found');
             setLogoutCookie(res);

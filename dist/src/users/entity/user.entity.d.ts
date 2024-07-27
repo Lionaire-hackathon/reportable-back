@@ -11,6 +11,8 @@ export declare class User {
     email: string;
     phone_number: string;
     role: Role;
+    essayLimit: number;
+    researchLimit: number;
     created_at: Date;
     updated_at: Date;
     identity: Identity;

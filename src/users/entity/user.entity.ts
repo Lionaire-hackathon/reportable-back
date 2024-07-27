@@ -35,6 +35,12 @@ export class User {
   @Column()
   role: Role;
 
+  @Column({default: 3})
+  essayLimit: number;
+
+  @Column({default: 3})
+  researchLimit: number;
+
   @CreateDateColumn()
   created_at: Date;
 

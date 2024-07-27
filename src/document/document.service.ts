@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Document } from './entity/document.entity';
 import { Repository } from 'typeorm';
@@ -20,7 +20,6 @@ import { ImageRun, HeadingLevel, AlignmentType } from 'docx';
 import sizeOf from 'image-size';
 import OpenAI from 'openai';
 import * as fs from 'fs';
-import * as dotenv from 'dotenv';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -66,9 +65,6 @@ export class DocumentService {
   async queryrag(pinc: Pinecone, query: string) {
     const pc = pinc;
     const index = pc.index('reportable-vectordb');
-    // const jsonFilePath = path.join(__dirname, '..', 'document/id2text.json');
-    //const projectRoot = path.resolve(__dirname, '..', '..');
-    //const jsonFilePath = path.join(projectRoot, 'id2text.json');
     const jsonFilePath = path.join(process.cwd(), 'id2text.json');
     console.log('jsonFilePath: ', jsonFilePath);
     const jsonData = JSON.parse(fs.readFileSync(jsonFilePath, 'utf-8'));
@@ -97,43 +93,83 @@ export class DocumentService {
   }
 
   async findOne(documentId: number): Promise<Document> {
-   return this.documentRepository.findOneBy({ id: documentId });
+    return this.documentRepository.findOneBy({ id: documentId });
   }
 
   async create(
     createDocumentDto: CreateDocumentDto,
     user_id: number,
   ): Promise<Document> {
-    const { title, amount, type, prompt, form, elements, core } =
-      createDocumentDto;
-
-    const user = await this.userRepository.findOneBy({ id: user_id });
-    const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
-
-    let retrieval = '';
     try {
-      retrieval = await this.queryrag(pc, core);
+      const user = await this.userRepository.findOneBy({ id: user_id });
+      if (!user) {
+        throw new Error('User not found');
+      }
+      const { title, amount, type, prompt, form, elements, core } =
+        createDocumentDto;
+
+      if (user.role === 'user') {
+        if (type === 'essay') {
+          if (user.essayLimit <= 0) {
+            throw new HttpException(
+              '에세이 작성 횟수 제한을 초과했습니다.(현재는 인당 3회만 가능합니다.)',
+              HttpStatus.BAD_REQUEST,
+            );
+          } else {
+            console.log('userId: ', user_id, 'essayLimit: ', user.essayLimit);
+            user.essayLimit -= 1;
+          }
+        } else if (type === 'research') {
+          if (user.researchLimit <= 0) {
+            throw new HttpException(
+              '연구 보고서 작성 횟수 제한을 초과했습니다. (현재는 인당 3회만 가능합니다.)',
+              HttpStatus.BAD_REQUEST,
+            );
+          } else {
+            console.log(
+              'userId: ',
+              user_id,
+              'researchLimit: ',
+              user.researchLimit,
+            );
+            user.researchLimit -= 1;
+          }
+        }
+      }
+
+      await this.userRepository.save(user);
+
+      const pc = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+
+      let retrieval = '';
+      try {
+        retrieval = type === 'research' ? await this.queryrag(pc, title) : '';
+      } catch (error) {
+        console.log(error);
+      }
+
+      const post = this.documentRepository.create({
+        title,
+        amount,
+        type,
+        prompt,
+        form,
+        elements,
+        core,
+        user,
+        retrieval,
+      });
+
+      return this.documentRepository.save(post);
     } catch (error) {
-      console.log(error);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        '서버 오류가 발생했습니다.',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
-
-    if (!user) {
-      throw new Error('User not found');
-    }
-
-    const post = this.documentRepository.create({
-      title,
-      amount,
-      type,
-      prompt,
-      form,
-      elements,
-      core,
-      user,
-      retrieval,
-    });
-
-    return this.documentRepository.save(post);
   }
 
   async deleteDocument(documentId: number): Promise<Document> {
@@ -754,9 +790,9 @@ export class DocumentService {
       throw new Error('Document not found');
     }
 
-    console.log("before downloadContentFromS3");
+    console.log('before downloadContentFromS3');
     const content: string = await this.downloadContentFromS3(document.url);
-    console.log("after downloadContentFromS3", content);
+    console.log('after downloadContentFromS3', content);
 
     const docChildren = await Promise.all(
       content.split('\n').map(async (line) => {

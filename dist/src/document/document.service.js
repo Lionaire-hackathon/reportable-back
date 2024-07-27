@@ -81,31 +81,60 @@ let DocumentService = class DocumentService {
         return this.documentRepository.findOneBy({ id: documentId });
     }
     async create(createDocumentDto, user_id) {
-        const { title, amount, type, prompt, form, elements, core } = createDocumentDto;
-        const user = await this.userRepository.findOneBy({ id: user_id });
-        const pc = new pinecone_1.Pinecone({ apiKey: process.env.PINECONE_API_KEY });
-        let retrieval = '';
         try {
-            retrieval = await this.queryrag(pc, core);
+            const user = await this.userRepository.findOneBy({ id: user_id });
+            if (!user) {
+                throw new Error('User not found');
+            }
+            const { title, amount, type, prompt, form, elements, core } = createDocumentDto;
+            if (user.role === 'user') {
+                if (type === 'essay') {
+                    if (user.essayLimit <= 0) {
+                        throw new common_1.HttpException('에세이 작성 횟수 제한을 초과했습니다.(현재는 인당 3회만 가능합니다.)', common_1.HttpStatus.BAD_REQUEST);
+                    }
+                    else {
+                        console.log('userId: ', user_id, 'essayLimit: ', user.essayLimit);
+                        user.essayLimit -= 1;
+                    }
+                }
+                else if (type === 'research') {
+                    if (user.researchLimit <= 0) {
+                        throw new common_1.HttpException('연구 보고서 작성 횟수 제한을 초과했습니다. (현재는 인당 3회만 가능합니다.)', common_1.HttpStatus.BAD_REQUEST);
+                    }
+                    else {
+                        console.log('userId: ', user_id, 'researchLimit: ', user.researchLimit);
+                        user.researchLimit -= 1;
+                    }
+                }
+            }
+            await this.userRepository.save(user);
+            const pc = new pinecone_1.Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+            let retrieval = '';
+            try {
+                retrieval = type === 'research' ? await this.queryrag(pc, title) : '';
+            }
+            catch (error) {
+                console.log(error);
+            }
+            const post = this.documentRepository.create({
+                title,
+                amount,
+                type,
+                prompt,
+                form,
+                elements,
+                core,
+                user,
+                retrieval,
+            });
+            return this.documentRepository.save(post);
         }
         catch (error) {
-            console.log(error);
+            if (error instanceof common_1.HttpException) {
+                throw error;
+            }
+            throw new common_1.HttpException('서버 오류가 발생했습니다.', common_1.HttpStatus.INTERNAL_SERVER_ERROR);
         }
-        if (!user) {
-            throw new Error('User not found');
-        }
-        const post = this.documentRepository.create({
-            title,
-            amount,
-            type,
-            prompt,
-            form,
-            elements,
-            core,
-            user,
-            retrieval,
-        });
-        return this.documentRepository.save(post);
     }
     async deleteDocument(documentId) {
         const document = await this.documentRepository.findOneBy({
@@ -593,9 +622,9 @@ let DocumentService = class DocumentService {
         if (!document) {
             throw new Error('Document not found');
         }
-        console.log("before downloadContentFromS3");
+        console.log('before downloadContentFromS3');
         const content = await this.downloadContentFromS3(document.url);
-        console.log("after downloadContentFromS3", content);
+        console.log('after downloadContentFromS3', content);
         const docChildren = await Promise.all(content.split('\n').map(async (line) => {
             const imageMatches = line.match(/<<(\d+)-(.+?)>>/);
             if (imageMatches) {
