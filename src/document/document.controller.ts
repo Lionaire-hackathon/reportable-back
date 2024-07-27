@@ -26,7 +26,7 @@ export class DocumentController {
   @UseGuards(JwtGuard)
   @Get('/:id')
   findOne(@Param('id') documentId: number, @Req() req) {
-    return this.documentService.findOne(documentId, req.user.userId);
+    return this.documentService.findOne(documentId);
   }
   // 새로운 문서를 생성합니다.
   @ApiBearerAuth('JWT')

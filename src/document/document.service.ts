@@ -96,17 +96,8 @@ export class DocumentService {
     return finalString;
   }
 
-  async findOne(documentId: number, userId: number): Promise<Document> {
-    if (!userId) {
-      throw new Error('User not found');
-    }
-    const user = await this.userRepository.findOneBy({ id: userId });
-    const document = await this.documentRepository.findOneBy({ id: documentId });
-    if(document.user !== user) {
-      throw new Error('Document not found');
-    } else {
-      return document;
-    }
+  async findOne(documentId: number): Promise<Document> {
+   return this.documentRepository.findOneBy({ id: documentId });
   }
 
   async create(

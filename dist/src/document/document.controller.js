@@ -25,7 +25,7 @@ let DocumentController = class DocumentController {
         this.documentService = documentService;
     }
     findOne(documentId, req) {
-        return this.documentService.findOne(documentId, req.user.userId);
+        return this.documentService.findOne(documentId);
     }
     create(createDocumentDto, req) {
         return this.documentService.create(createDocumentDto, req.user.userId);

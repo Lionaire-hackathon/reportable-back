@@ -30,7 +30,7 @@ export declare class DocumentService {
     private s3;
     constructor(documentRepository: Repository<Document>, userRepository: Repository<User>, fileRepository: Repository<File>, editRepository: Repository<Edit>);
     queryrag(pinc: Pinecone, query: string): Promise<string>;
-    findOne(documentId: number, userId: number): Promise<Document>;
+    findOne(documentId: number): Promise<Document>;
     create(createDocumentDto: CreateDocumentDto, user_id: number): Promise<Document>;
     deleteDocument(documentId: number): Promise<Document>;
     firstPrompt(documentId: number): Promise<any>;
