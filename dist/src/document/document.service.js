@@ -88,7 +88,7 @@ let DocumentService = class DocumentService {
         const pc = new pinecone_1.Pinecone({ apiKey: process.env.PINECONE_API_KEY });
         let retrieval = '';
         try {
-            retrieval = await this.queryrag(pc, core);
+            retrieval = !core ? '' : await this.queryrag(pc, title);
         }
         catch (error) {
             console.log(error);
@@ -125,9 +125,12 @@ let DocumentService = class DocumentService {
         if (!document) {
             throw new Error('Document not found');
         }
-        const response = await this.claudeApiCall(document, `에세이 주제 "${document.title}"에 대해 답변하기 위해서 내용과 관련해서 너가 모르는 정보나 사용자의 견해 등 추가적으로 받아야 할 정보가 있어? 있으면 
-      { "needMorePrompt" : 1, "prompt": ["질문1 내용", "질문2 내용",...]} 형태로 대답하고, 없으면 
-      { "needMorePrompt" : 0 } 으로 대답해 (중요!)대답은 반드시 JSON 형식이어야만 해`, process.env.ANTHROPIC_API_KEY_1);
+        const task = async (apiKey) => {
+            return this.claudeApiCall(document, `에세이 주제 "${document.title}"에 대해 답변하기 위해서 내용과 관련해서 너가 모르는 정보나 사용자의 견해 등 추가적으로 받아야 할 정보가 있어? 있으면 
+        { "needMorePrompt" : 1, "prompt": ["질문1 내용", "질문2 내용",...]} 형태로 대답하고, 없으면 
+        { "needMorePrompt" : 0 } 으로 대답해 (중요!)대답은 반드시 JSON 형식이어야만 해`, apiKey);
+        };
+        const response = await this.apiKeyService.executeTask(task);
         return response;
     }
     async createContent(documentId) {

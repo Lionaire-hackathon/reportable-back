@@ -20,7 +20,6 @@ import { ImageRun, HeadingLevel, AlignmentType } from 'docx';
 import sizeOf from 'image-size';
 import OpenAI from 'openai';
 import * as fs from 'fs';
-import * as dotenv from 'dotenv';
 import { ApiKeyService } from './api-key.service';
 
 const openai = new OpenAI({
@@ -114,7 +113,7 @@ export class DocumentService {
 
     let retrieval = '';
     try {
-      retrieval = await this.queryrag(pc, core);
+      retrieval = !core ? '' : await this.queryrag(pc, title);
     } catch (error) {
       console.log(error);
     }
@@ -158,13 +157,17 @@ export class DocumentService {
       throw new Error('Document not found');
     }
 
-    const response = await this.claudeApiCall(
-      document,
-      `에세이 주제 "${document.title}"에 대해 답변하기 위해서 내용과 관련해서 너가 모르는 정보나 사용자의 견해 등 추가적으로 받아야 할 정보가 있어? 있으면 
-      { "needMorePrompt" : 1, "prompt": ["질문1 내용", "질문2 내용",...]} 형태로 대답하고, 없으면 
-      { "needMorePrompt" : 0 } 으로 대답해 (중요!)대답은 반드시 JSON 형식이어야만 해`,
-      process.env.ANTHROPIC_API_KEY_1,
-    );
+    const task = async (apiKey: string) => {
+      return this.claudeApiCall(
+        document,
+        `에세이 주제 "${document.title}"에 대해 답변하기 위해서 내용과 관련해서 너가 모르는 정보나 사용자의 견해 등 추가적으로 받아야 할 정보가 있어? 있으면 
+        { "needMorePrompt" : 1, "prompt": ["질문1 내용", "질문2 내용",...]} 형태로 대답하고, 없으면 
+        { "needMorePrompt" : 0 } 으로 대답해 (중요!)대답은 반드시 JSON 형식이어야만 해`,
+        apiKey,
+      );
+    };
+
+    const response = await this.apiKeyService.executeTask(task);
 
     return response;
   }
@@ -202,9 +205,15 @@ export class DocumentService {
       console.log('response stop reason', response.stop_reason);
       console.log('prompt history', promptHistory);
       console.log('@@@Continuing the conversation...');
-      const continuedResponse = await this.apiKeyService.executeTask(async (apiKey) => {
-        return this.claudeApiCallWithPromptHistory(document, promptHistory, apiKey);
-      });
+      const continuedResponse = await this.apiKeyService.executeTask(
+        async (apiKey) => {
+          return this.claudeApiCallWithPromptHistory(
+            document,
+            promptHistory,
+            apiKey,
+          );
+        },
+      );
       totalInputTokenCount += continuedResponse.usage.input_tokens;
       totalOutputTokenCount += continuedResponse.usage.output_tokens;
       textOutput =

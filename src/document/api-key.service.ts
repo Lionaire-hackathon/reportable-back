@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-// import Queue from 'queue-promise'; // 이 줄을 주석 처리합니다.
-const Queue = require('queue-promise'); // require 방식으로 Queue 가져오기
+const Queue = require('queue-promise');
 
 @Injectable()
 export class ApiKeyService {
   private apiKeys: string[];
   private queues: Map<string, any>;
+  private queueSizes: Map<string, number>;
 
   constructor() {
     this.apiKeys = [
@@ -15,15 +15,26 @@ export class ApiKeyService {
       process.env.ANTHROPIC_API_KEY_4,
     ];
     this.queues = new Map();
+    this.queueSizes = new Map();
 
     this.apiKeys.forEach(key => {
-      this.queues.set(key, new Queue({ concurrent: 1, interval: 1000 }));
+      const queue = new Queue({ concurrent: 1, interval: 1000 });
+      this.queues.set(key, queue);
+      this.queueSizes.set(key, 0);
+
+      queue.on('start', () => {
+        this.queueSizes.set(key, this.queueSizes.get(key) + 1);
+      });
+      queue.on('end', () => {
+        this.queueSizes.set(key, this.queueSizes.get(key) - 1);
+      });
     });
   }
 
   async executeTask<T>(task: (apiKey: string) => Promise<T>): Promise<T> {
     const apiKey = this.getLeastBusyApiKey();
     const queue = this.queues.get(apiKey);
+    console.log('api key index: ', this.apiKeys.indexOf(apiKey));
 
     return new Promise((resolve, reject) => {
       queue.enqueue(async () => {
@@ -39,9 +50,9 @@ export class ApiKeyService {
 
   private getLeastBusyApiKey(): string {
     return this.apiKeys.reduce((leastBusyKey, currentKey) => {
-      const leastBusyQueue = this.queues.get(leastBusyKey);
-      const currentQueue = this.queues.get(currentKey);
-      return currentQueue.size < leastBusyQueue.size ? currentKey : leastBusyKey;
+      const leastBusySize = this.queueSizes.get(leastBusyKey);
+      const currentSize = this.queueSizes.get(currentKey);
+      return currentSize < leastBusySize ? currentKey : leastBusyKey;
     });
   }
 }
