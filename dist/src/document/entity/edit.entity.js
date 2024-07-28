@@ -26,7 +26,7 @@ __decorate([
     __metadata("design:type", document_entity_1.Document)
 ], Edit.prototype, "document", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => user_entity_1.User, (user) => user.edits),
+    (0, typeorm_1.ManyToOne)(() => user_entity_1.User, (user) => user.edits, { onDelete: 'CASCADE' }),
     (0, typeorm_1.JoinColumn)(),
     __metadata("design:type", user_entity_1.User)
 ], Edit.prototype, "user", void 0);

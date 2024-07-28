@@ -83,7 +83,7 @@ __decorate([
     __metadata("design:type", Date)
 ], Document.prototype, "updated_at", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => user_entity_1.User, (user) => user.documents),
+    (0, typeorm_1.ManyToOne)(() => user_entity_1.User, (user) => user.documents, { onDelete: 'CASCADE' }),
     (0, typeorm_1.JoinColumn)(),
     __metadata("design:type", user_entity_1.User)
 ], Document.prototype, "user", void 0);

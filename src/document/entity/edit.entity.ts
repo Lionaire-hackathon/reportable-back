@@ -19,7 +19,7 @@ export class Edit {
   @JoinColumn()
   document: Document;
 
-  @ManyToOne(() => User, (user) => user.edits)
+  @ManyToOne(() => User, (user) => user.edits, { onDelete: 'CASCADE' })
   @JoinColumn()
   user: User;
 
