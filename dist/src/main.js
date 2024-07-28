@@ -11,8 +11,9 @@ async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     app.use(cookieParser());
     app.useGlobalFilters(new all_exceptions_filter_1.AllExceptionsFilter());
+    const FRONTEND_URL = process.env.ENV === "production" ? process.env.FRONTEND_PROD_URL : process.env.FRONTEND_DEV_URL;
     app.enableCors({
-        origin: true,
+        origin: FRONTEND_URL,
         methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
         credentials: true,
     });
@@ -27,8 +28,6 @@ async function bootstrap() {
         bearerFormat: 'JWT',
     }, 'JWT')
         .build();
-    const document = swagger_1.SwaggerModule.createDocument(app, config);
-    swagger_1.SwaggerModule.setup('api-docs', app, document);
     await app.listen(8080);
 }
 bootstrap();

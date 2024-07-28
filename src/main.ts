@@ -17,9 +17,11 @@ async function bootstrap() {
 
   app.useGlobalFilters(new AllExceptionsFilter());
 
+  const FRONTEND_URL = process.env.ENV === "production" ? process.env.FRONTEND_PROD_URL : process.env.FRONTEND_DEV_URL;
+
   // CORS를 활성화합니다.
   app.enableCors({
-    origin: true,
+    origin: FRONTEND_URL,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
@@ -39,8 +41,6 @@ async function bootstrap() {
       'JWT',
     )
     .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api-docs', app, document);
 
   // 애플리케이션을 8080 포트에서 실행합니다.
   await app.listen(8080);
