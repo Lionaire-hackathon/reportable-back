@@ -39,6 +39,15 @@ let EmailService = class EmailService {
         };
         await this.transporter.sendMail(message);
     }
+    async sendMail(to, subject, html) {
+        const message = {
+            from: process.env.GMAIL_USER,
+            to: to,
+            subject: subject,
+            html: html,
+        };
+        await this.transporter.sendMail(message);
+    }
 };
 exports.EmailService = EmailService;
 exports.EmailService = EmailService = __decorate([

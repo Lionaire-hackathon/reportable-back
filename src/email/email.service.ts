@@ -32,4 +32,14 @@ export class EmailService {
     };
     await this.transporter.sendMail(message);
   }
+
+  async sendMail(to: string, subject: string, html: string): Promise<void> {
+    const message = {
+      from: process.env.GMAIL_USER,
+      to: to,
+      subject: subject,
+      html: html,
+    };
+    await this.transporter.sendMail(message);
+  }
 }

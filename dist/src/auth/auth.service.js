@@ -89,6 +89,13 @@ let AuthService = class AuthService {
             provider: 'email',
         });
         await this.identityRepository.save(identity);
+        await this.emailService.sendMail('songjunjun62754@gmail.com', `${signUpDto.name}님이 회원가입하셨습니다.`, `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h2>회원가입</h2>
+        <p>${signUpDto.name}님이 회원가입하셨습니다.</p>
+        <p>이메일: ${signUpDto.email}</p>
+        <p>전화번호: ${signUpDto.phone_number}</p>
+        `);
         res.sendStatus(200);
     }
     async login(res, loginDto) {
