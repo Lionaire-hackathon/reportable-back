@@ -88,7 +88,7 @@ export class AuthService {
 
     // 이미 존재하는 이메일이라면 예외를 발생시킵니다.
     if (existingIdentity) {
-      throw new ConflictException('이미 존재하는 이메일입니다.');
+      throw new ConflictException('이미 가입된 이메일입니다.');
     }
 
     // 비밀번호를 해싱합니다.
