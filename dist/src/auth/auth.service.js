@@ -177,6 +177,13 @@ let AuthService = class AuthService {
                 name: userPayload.name,
                 phone_number: '',
             });
+            await this.emailService.sendMail('songjunjun62754@gmail.com', `${userPayload.name}님이 회원가입하셨습니다.`, `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+        <h2>회원가입</h2>
+        <p>${userPayload.name}님이 회원가입하셨습니다.</p>
+        <p>이메일: ${userPayload.email}</p>
+        <p>구글 로그인</p>
+        `);
         }
         const payload = { email: user.email, sub: user.id, role: user.role };
         const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
