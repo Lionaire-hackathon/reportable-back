@@ -21,13 +21,22 @@ let UsersController = class UsersController {
     constructor(usersService) {
         this.usersService = usersService;
     }
-    async update(id, updateUserDto) {
+    async update(id, updateUserDto, req) {
+        if (req.user.userId !== id) {
+            throw new Error('사용자 정보를 수정할 수 없습니다.');
+        }
         return this.usersService.updateUser(id, updateUserDto);
     }
-    async findOne(id) {
+    async findOne(id, req) {
+        if (req.user.userId !== id) {
+            throw new Error('사용자 정보를 조회할 수 없습니다.');
+        }
         return this.usersService.findOneById(id);
     }
-    async remove(id) {
+    async remove(id, req) {
+        if (req.user.userId !== id) {
+            throw new Error('사용자 정보를 삭제할 수 없습니다.');
+        }
         return this.usersService.removeUser(id);
     }
 };
@@ -37,24 +46,27 @@ __decorate([
     (0, common_1.Put)(':id'),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, update_user_dto_1.UpdateUserDto]),
+    __metadata("design:paramtypes", [Number, update_user_dto_1.UpdateUserDto, Object]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "update", null);
 __decorate([
     (0, common_1.UseGuards)(jwt_guard_1.JwtGuard),
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "findOne", null);
 __decorate([
     (0, common_1.UseGuards)(jwt_guard_1.JwtGuard),
     (0, common_1.Delete)(':id'),
     __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number]),
+    __metadata("design:paramtypes", [Number, Object]),
     __metadata("design:returntype", Promise)
 ], UsersController.prototype, "remove", null);
 exports.UsersController = UsersController = __decorate([
