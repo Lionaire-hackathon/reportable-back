@@ -44,6 +44,9 @@ async function bootstrap() {
 
   // 애플리케이션을 8080 포트에서 실행합니다.
   await app.listen(8080);
+  
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api-docs', app, document);
 }
 
 // 애플리케이션을 실행합니다.

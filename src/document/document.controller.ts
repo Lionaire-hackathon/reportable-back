@@ -50,6 +50,7 @@ export class DocumentController {
     return this.documentService.createContent(documentId);
   }
   
+  @UseGuards(JwtGuard)
   @Post('first-prompt/:id')
   firstPrompt(@Param('id') documentId: number) {
     return this.documentService.firstPrompt(documentId);
@@ -76,6 +77,7 @@ export class DocumentController {
     return this.documentService.editPrompt(editPromptDto);
   }
 
+  @UseGuards(JwtGuard)
   @Get('doc/:id')
   getDocFile(@Param('id') documentId: number) {
     return this.documentService.getDocFile(documentId);
