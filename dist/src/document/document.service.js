@@ -90,7 +90,7 @@ let DocumentService = class DocumentService {
             if (user.role === 'user') {
                 if (type === 'essay') {
                     if (user.essayLimit <= 0) {
-                        throw new common_1.HttpException('에세이 작성 횟수 제한을 초과했습니다.(현재는 인당 3회만 가능합니다.)', common_1.HttpStatus.BAD_REQUEST);
+                        throw new common_1.HttpException('에세이 작성 횟수 제한을 초과했습니다.(현재는 월 3회만 가능합니다.)', common_1.HttpStatus.BAD_REQUEST);
                     }
                     else {
                         console.log('userId: ', user_id, 'essayLimit: ', user.essayLimit);
@@ -99,7 +99,7 @@ let DocumentService = class DocumentService {
                 }
                 else if (type === 'research') {
                     if (user.researchLimit <= 0) {
-                        throw new common_1.HttpException('연구 보고서 작성 횟수 제한을 초과했습니다. (현재는 인당 3회만 가능합니다.)', common_1.HttpStatus.BAD_REQUEST);
+                        throw new common_1.HttpException('연구 보고서 작성 횟수 제한을 초과했습니다. (현재는 월 3회만 가능합니다.)', common_1.HttpStatus.BAD_REQUEST);
                     }
                     else {
                         console.log('userId: ', user_id, 'researchLimit: ', user.researchLimit);
