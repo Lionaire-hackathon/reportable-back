@@ -120,7 +120,7 @@ export class AuthService {
       });
 
     if (!verification.is_verified) {
-      throw new UnauthorizedException('Email is not verified');
+      throw new ConflictException('이메일 인증이 완료되지 않았습니다.');
     } else {
       res.sendStatus(200);
     }

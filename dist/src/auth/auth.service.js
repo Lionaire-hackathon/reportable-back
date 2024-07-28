@@ -67,7 +67,7 @@ let AuthService = class AuthService {
             where: { email: signUpDto.email },
         });
         if (existingIdentity) {
-            throw new common_1.ConflictException('이미 존재하는 이메일입니다.');
+            throw new common_1.ConflictException('이미 가입된 이메일입니다.');
         }
         const hashedPassword = await bcrypt.hash(signUpDto.password, 10);
         const user = await this.usersService.createUser({
@@ -87,7 +87,7 @@ let AuthService = class AuthService {
             order: { expired_at: 'DESC' },
         });
         if (!verification.is_verified) {
-            throw new common_1.UnauthorizedException('Email is not verified');
+            throw new common_1.ConflictException('이메일 인증이 완료되지 않았습니다.');
         }
         else {
             res.sendStatus(200);
