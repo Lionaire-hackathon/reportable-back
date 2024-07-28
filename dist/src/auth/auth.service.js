@@ -169,6 +169,7 @@ let AuthService = class AuthService {
         (0, auth_util_1.setLogoutCookie)(res);
     }
     async validateOAuthLogin(userPayload, provider) {
+        console.log("validateOAuthLogin", userPayload);
         let user = await this.usersService.findOne(userPayload.email);
         if (!user) {
             user = await this.usersService.createUser({

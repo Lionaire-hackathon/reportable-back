@@ -243,6 +243,7 @@ export class AuthService {
 
   // 구글 로그인 요청을 처리합니다.
   async validateOAuthLogin(userPayload: any, provider: string) {
+    console.log("validateOAuthLogin", userPayload);
     // 사용자의 정보를 찾습니다.
     let user: User = await this.usersService.findOne(userPayload.email);
 

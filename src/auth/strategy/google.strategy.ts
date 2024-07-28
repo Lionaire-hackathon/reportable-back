@@ -18,6 +18,7 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
 
   // 구글 로그인 성공 시 호출됩니다.
   async validate(accessToken: string, refreshToken: string, profile: any, done: VerifyCallback) {
+    console.log("GoogleStrategy validate", profile);
     const { displayName, emails } = profile;
     const userPayload = {
       email: emails[0].value,
