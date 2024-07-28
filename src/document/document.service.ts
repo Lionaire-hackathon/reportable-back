@@ -112,7 +112,7 @@ export class DocumentService {
         if (type === 'essay') {
           if (user.essayLimit <= 0) {
             throw new HttpException(
-              '에세이 작성 횟수 제한을 초과했습니다.(현재는 인당 3회만 가능합니다.)',
+              '에세이 작성 횟수 제한을 초과했습니다.(현재는 월 3회만 가능합니다.)',
               HttpStatus.BAD_REQUEST,
             );
           } else {
@@ -122,7 +122,7 @@ export class DocumentService {
         } else if (type === 'research') {
           if (user.researchLimit <= 0) {
             throw new HttpException(
-              '연구 보고서 작성 횟수 제한을 초과했습니다. (현재는 인당 3회만 가능합니다.)',
+              '연구 보고서 작성 횟수 제한을 초과했습니다. (현재는 월 3회만 가능합니다.)',
               HttpStatus.BAD_REQUEST,
             );
           } else {
