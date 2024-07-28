@@ -90,7 +90,16 @@ export class AuthService {
     if (existingIdentity) {
       throw new ConflictException('이미 가입된 이메일입니다.');
     }
+    //verification entity에서 해당 이메일의 인증 정보를 가져와서 is_verified가 true인지 확인
+    const verification: Verification =
+      await this.verificationRepository.findOne({
+        where: { email: signUpDto.email },
+        order: { expired_at: 'DESC' }, // expired_at를 기준으로 최신 항목 선택
+      });
 
+    if (!verification.is_verified) {
+      throw new ConflictException('이메일 인증이 완료되지 않았습니다.');
+    }
     // 비밀번호를 해싱합니다.
     const hashedPassword = await bcrypt.hash(signUpDto.password, 10);
 
@@ -112,18 +121,7 @@ export class AuthService {
     // 사용자의 인증 정보를 저장합니다.
     await this.identityRepository.save(identity);
 
-    //verification entity에서 해당 이메일의 인증 정보를 가져와서 is_verified가 true인지 확인
-    const verification: Verification =
-      await this.verificationRepository.findOne({
-        where: { email: signUpDto.email },
-        order: { expired_at: 'DESC' }, // expired_at를 기준으로 최신 항목 선택
-      });
-
-    if (!verification.is_verified) {
-      throw new ConflictException('이메일 인증이 완료되지 않았습니다.');
-    } else {
-      res.sendStatus(200);
-    }
+    res.sendStatus(200);
   }
 
   // 로그인 요청을 처리합니다.
@@ -193,35 +191,38 @@ export class AuthService {
   // 토큰 갱신 요청을 처리합니다.
   async refreshToken(res: Response, token: string) {
     try {
-        console.log('Refreshing token:', token);
+      console.log('Refreshing token:', token);
 
-        const decoded = this.jwtService.verify(token);
-        console.log('Decoded token:', decoded);
+      const decoded = this.jwtService.verify(token);
+      console.log('Decoded token:', decoded);
 
-        const identity = await this.identityRepository.findOne({
-            where: { user: { id: decoded.sub } },
-            relations: ['user'],
-        });
+      const identity = await this.identityRepository.findOne({
+        where: { user: { id: decoded.sub } },
+        relations: ['user'],
+      });
 
-        console.log('Identity.refreshToken:', identity.refreshToken);
+      console.log('Identity.refreshToken:', identity.refreshToken);
 
-        if (!identity || identity.refreshToken !== token) {
-            console.log('Invalid token or user not found');
-            setLogoutCookie(res);
-            throw new UnauthorizedException('Invalid token');
-        }
-
-        const payload = { email: identity.email, sub: identity.user.id, role: identity.user.role };
-        const accessToken = this.jwtService.sign(payload, { expiresIn: '30m' });
-
-        setLoginCookie(res, accessToken, token);
-        res.sendStatus(200);
-    } catch (error) {
-        console.log('Error during token refresh:', error);
+      if (!identity || identity.refreshToken !== token) {
+        console.log('Invalid token or user not found');
+        setLogoutCookie(res);
         throw new UnauthorizedException('Invalid token');
-    }
-}
+      }
 
+      const payload = {
+        email: identity.email,
+        sub: identity.user.id,
+        role: identity.user.role,
+      };
+      const accessToken = this.jwtService.sign(payload, { expiresIn: '30m' });
+
+      setLoginCookie(res, accessToken, token);
+      res.sendStatus(200);
+    } catch (error) {
+      console.log('Error during token refresh:', error);
+      throw new UnauthorizedException('Invalid token');
+    }
+  }
 
   // 로그아웃 요청을 처리합니다.
   async logout(res: Response) {
@@ -235,11 +236,11 @@ export class AuthService {
 
     // 사용자가 존재하지 않는다면 사용자를 생성합니다.
     if (!user) {
-        user = await this.usersService.createUser({
-            email: userPayload.email,
-            name: userPayload.name,
-            phone_number: '',
-        });
+      user = await this.usersService.createUser({
+        email: userPayload.email,
+        name: userPayload.name,
+        phone_number: '',
+      });
     }
 
     // 사용자의 정보를 토큰에 담습니다.
@@ -249,35 +250,34 @@ export class AuthService {
 
     // 사용자의 인증 정보를 찾습니다.
     let identity = await this.identityRepository.findOneBy({
-        email: userPayload.email,
+      email: userPayload.email,
     });
 
     // 사용자의 인증 정보가 존재하지 않는다면 생성합니다.
     if (!identity) {
-        // 사용자의 인증 정보를 생성합니다.
-        identity = this.identityRepository.create({
-            email: userPayload.email,
-            provider,
-            user,
-            refreshToken,
-        });
+      // 사용자의 인증 정보를 생성합니다.
+      identity = this.identityRepository.create({
+        email: userPayload.email,
+        provider,
+        user,
+        refreshToken,
+      });
 
-        // 사용자의 인증 정보를 저장합니다.
-        await this.identityRepository.save(identity);
+      // 사용자의 인증 정보를 저장합니다.
+      await this.identityRepository.save(identity);
     } else {
-        if (identity.provider !== provider) {
-            throw new UnauthorizedException('이미 존재하는 이메일입니다.');
-        } else {
-            identity.refreshToken = refreshToken;
-            await this.identityRepository.save(identity);
+      if (identity.provider !== provider) {
+        throw new UnauthorizedException('이미 존재하는 이메일입니다.');
+      } else {
+        identity.refreshToken = refreshToken;
+        await this.identityRepository.save(identity);
 
-            // 디버깅을 위해 로그 추가
-            console.log('Updated refreshToken:', identity.refreshToken);
-        }
+        // 디버깅을 위해 로그 추가
+        console.log('Updated refreshToken:', identity.refreshToken);
+      }
     }
 
     // 토큰을 반환합니다.
     return { accessToken, refreshToken };
-}
-
+  }
 }

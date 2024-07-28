@@ -69,6 +69,13 @@ let AuthService = class AuthService {
         if (existingIdentity) {
             throw new common_1.ConflictException('이미 가입된 이메일입니다.');
         }
+        const verification = await this.verificationRepository.findOne({
+            where: { email: signUpDto.email },
+            order: { expired_at: 'DESC' },
+        });
+        if (!verification.is_verified) {
+            throw new common_1.ConflictException('이메일 인증이 완료되지 않았습니다.');
+        }
         const hashedPassword = await bcrypt.hash(signUpDto.password, 10);
         const user = await this.usersService.createUser({
             email: signUpDto.email,
@@ -82,16 +89,7 @@ let AuthService = class AuthService {
             provider: 'email',
         });
         await this.identityRepository.save(identity);
-        const verification = await this.verificationRepository.findOne({
-            where: { email: signUpDto.email },
-            order: { expired_at: 'DESC' },
-        });
-        if (!verification.is_verified) {
-            throw new common_1.ConflictException('이메일 인증이 완료되지 않았습니다.');
-        }
-        else {
-            res.sendStatus(200);
-        }
+        res.sendStatus(200);
     }
     async login(res, loginDto) {
         const identity = await this.identityRepository.findOne({
@@ -146,7 +144,11 @@ let AuthService = class AuthService {
                 (0, auth_util_1.setLogoutCookie)(res);
                 throw new common_1.UnauthorizedException('Invalid token');
             }
-            const payload = { email: identity.email, sub: identity.user.id, role: identity.user.role };
+            const payload = {
+                email: identity.email,
+                sub: identity.user.id,
+                role: identity.user.role,
+            };
             const accessToken = this.jwtService.sign(payload, { expiresIn: '30m' });
             (0, auth_util_1.setLoginCookie)(res, accessToken, token);
             res.sendStatus(200);
