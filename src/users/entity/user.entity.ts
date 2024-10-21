@@ -26,19 +26,22 @@ export class User {
   @Column()
   name: string;
 
-  @Column()
+  @Column({ unique: true, nullable: true }) // 이메일은 카카오 로그인의 경우 null일 수 있음
   email: string;
 
-  @Column()
+  @Column({ nullable: true }) // 전화번호도 카카오에서 제공되지 않을 수 있음
   phone_number: string;
+
+  @Column({ unique: true, nullable: true }) // 카카오 사용자 고유 ID, 유일해야 함
+  kakaoId: string;
 
   @Column()
   role: Role;
 
-  @Column({default: 3})
+  @Column({ default: 3 })
   essayLimit: number;
 
-  @Column({default: 3})
+  @Column({ default: 3 })
   researchLimit: number;
 
   @CreateDateColumn()
@@ -47,7 +50,11 @@ export class User {
   @UpdateDateColumn()
   updated_at: Date;
 
-  @OneToOne(() => Identity, { cascade: true, onDelete: 'CASCADE', onUpdate: 'CASCADE' })
+  @OneToOne(() => Identity, {
+    cascade: true,
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE',
+  })
   @JoinColumn()
   identity: Identity;
 

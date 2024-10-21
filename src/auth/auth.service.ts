@@ -241,32 +241,102 @@ export class AuthService {
     setLogoutCookie(res);
   }
 
-  // 구글 로그인 요청을 처리합니다.
+  // // 구글 로그인 요청을 처리합니다.
+  // async validateOAuthLogin(userPayload: any, provider: string) {
+  //   console.log("validateOAuthLogin", userPayload);
+  //   // 사용자의 정보를 찾습니다.
+  //   let user: User = await this.usersService.findOne(userPayload.email);
+
+  //   // 사용자가 존재하지 않는다면 사용자를 생성합니다.
+  //   if (!user) {
+  //     user = await this.usersService.createUser({
+  //       email: userPayload.email,
+  //       name: userPayload.name,
+  //       phone_number: '',
+  //     });
+
+  //   await this.emailService.sendMail(
+  //     'songjunjun62754@gmail.com',
+  //     `${userPayload.name}님이 회원가입하셨습니다.`,
+  //     `
+  //     <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+  //       <h2>회원가입</h2>
+  //       <p>${userPayload.name}님이 회원가입하셨습니다.</p>
+  //       <p>이메일: ${userPayload.email}</p>
+  //       <p>구글 로그인</p>
+  //       `,
+  //   );
+  //   }
+
+  //   // 사용자의 정보를 토큰에 담습니다.
+  //   const payload = { email: user.email, sub: user.id, role: user.role };
+  //   const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
+  //   const refreshToken = this.jwtService.sign(payload, { expiresIn: '30d' });
+
+  //   // 사용자의 인증 정보를 찾습니다.
+  //   let identity = await this.identityRepository.findOneBy({
+  //     email: userPayload.email,
+  //   });
+
+  //   // 사용자의 인증 정보가 존재하지 않는다면 생성합니다.
+  //   if (!identity) {
+  //     // 사용자의 인증 정보를 생성합니다.
+  //     identity = this.identityRepository.create({
+  //       email: userPayload.email,
+  //       provider,
+  //       user,
+  //       refreshToken,
+  //     });
+
+  //     // 사용자의 인증 정보를 저장합니다.
+  //     await this.identityRepository.save(identity);
+  //   } else {
+  //     if (identity.provider !== provider) {
+  //       throw new UnauthorizedException('이미 존재하는 이메일입니다.');
+  //     } else {
+  //       identity.refreshToken = refreshToken;
+  //       await this.identityRepository.save(identity);
+
+  //       // 디버깅을 위해 로그 추가
+  //       console.log('Updated refreshToken:', identity.refreshToken);
+  //     }
+  //   }
+
+  //   // 토큰을 반환합니다.
+  //   return { accessToken, refreshToken };
+  // }
+
+  // 구글, 카카오 로그인을 처리합니다
   async validateOAuthLogin(userPayload: any, provider: string) {
-    console.log("validateOAuthLogin", userPayload);
-    // 사용자의 정보를 찾습니다.
-    let user: User = await this.usersService.findOne(userPayload.email);
+    console.log('validateOAuthLogin', userPayload);
+
+    // 카카오 고유 ID를 이용해 사용자를 식별합니다.
+    const kakaoId = userPayload.kakaoId;
+
+    // 카카오 사용자 고유 ID로 사용자를 찾습니다.
+    let user: User = await this.usersService.findOneByKakaoId(kakaoId);
 
     // 사용자가 존재하지 않는다면 사용자를 생성합니다.
     if (!user) {
       user = await this.usersService.createUser({
-        email: userPayload.email,
-        name: userPayload.name,
-        phone_number: '',
+        kakaoId: kakaoId, // 고유한 카카오 ID
+        email: userPayload.email || '', // 이메일이 없는 경우 빈 문자열
+        name: userPayload.name || '카카오 사용자', // 이름이 없는 경우 기본 이름
+        phone_number: userPayload.phone_number || '', // 전화번호는 카카오에 없을 수 있음
       });
 
-
-    await this.emailService.sendMail(
-      'songjunjun62754@gmail.com',
-      `${userPayload.name}님이 회원가입하셨습니다.`,
-      `
-      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-        <h2>회원가입</h2>
-        <p>${userPayload.name}님이 회원가입하셨습니다.</p>
-        <p>이메일: ${userPayload.email}</p>
-        <p>구글 로그인</p>
+      // 회원가입 알림 이메일 전송
+      await this.emailService.sendMail(
+        'songjunjun62754@gmail.com',
+        `${userPayload.name || '카카오 사용자'}님이 회원가입하셨습니다.`,
+        `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <h2>회원가입</h2>
+          <p>${userPayload.name || '카카오 사용자'}님이 회원가입하셨습니다.</p>
+          <p>이메일: ${userPayload.email || '없음'}</p>
+          <p>카카오 로그인</p>
         `,
-    );
+      );
     }
 
     // 사용자의 정보를 토큰에 담습니다.
@@ -276,14 +346,15 @@ export class AuthService {
 
     // 사용자의 인증 정보를 찾습니다.
     let identity = await this.identityRepository.findOneBy({
-      email: userPayload.email,
+      kakaoId: kakaoId, // 카카오 고유 ID로 사용자 조회
     });
 
     // 사용자의 인증 정보가 존재하지 않는다면 생성합니다.
     if (!identity) {
       // 사용자의 인증 정보를 생성합니다.
       identity = this.identityRepository.create({
-        email: userPayload.email,
+        kakaoId: kakaoId, // 카카오 고유 ID
+        email: userPayload.email || '', // 이메일이 없을 수 있음
         provider,
         user,
         refreshToken,
@@ -292,14 +363,12 @@ export class AuthService {
       // 사용자의 인증 정보를 저장합니다.
       await this.identityRepository.save(identity);
     } else {
+      // provider가 다를 경우 예외 처리
       if (identity.provider !== provider) {
         throw new UnauthorizedException('이미 존재하는 이메일입니다.');
       } else {
         identity.refreshToken = refreshToken;
         await this.identityRepository.save(identity);
-
-        // 디버깅을 위해 로그 추가
-        console.log('Updated refreshToken:', identity.refreshToken);
       }
     }
 

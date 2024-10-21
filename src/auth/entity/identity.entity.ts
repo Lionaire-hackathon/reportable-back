@@ -13,17 +13,20 @@ export class Identity {
   @PrimaryGeneratedColumn() // 기본키를 생성합니다.
   id: number;
 
-  @Column()
-  email: string;
+  @Column({ nullable: true })
+  email: string; // 카카오 로그인 시 이메일이 없을 수 있으므로 nullable로 설정
 
   @Column({ nullable: true })
-  password: string;
+  password: string; // 카카오 로그인 시 비밀번호가 없을 수 있으므로 nullable로 설정
 
   @Column({ nullable: true, length: 1000 })
   refreshToken?: string;
 
   @Column({ nullable: true })
-  provider: string;
+  provider: string; // 'google', 'kakao' 등 제공자 이름을 저장
+
+  @Column({ nullable: true, unique: true }) // 카카오 사용자 고유 ID를 저장
+  kakaoId: string; // 카카오 로그인 시 사용
 
   @Column()
   is_email_verified: Boolean;

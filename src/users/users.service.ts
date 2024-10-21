@@ -33,13 +33,18 @@ export class UsersService {
 
   async findOne(email: string): Promise<User | undefined> {
     return this.userRepository.findOneBy({
-      email: email
+      email: email,
     });
   }
 
   // ID를 기반으로 사용자를 조회합니다.
   async findOneById(id: number): Promise<User | undefined> {
     return this.userRepository.findOneBy({ id });
+  }
+
+  // Kakao ID를 기반으로 사용자를 조회합니다.
+  async findOneByKakaoId(kakaoId: string): Promise<User> {
+    return this.userRepository.findOneBy({ kakaoId });
   }
 
   async updateUser(id: number, updateUserDto: UpdateUserDto): Promise<User> {

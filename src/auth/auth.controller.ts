@@ -116,4 +116,39 @@ export class AuthController {
         .json({ message: 'Internal server error', error: error.message });
     }
   }
+
+  // 카카오 로그인 요청 라우트
+  @Get('kakao')
+  @UseGuards(AuthGuard('kakao')) // 'kakao' 전략을 사용
+  async kakaoLogin() {
+    // 카카오 로그인으로 리다이렉트 처리 (이 부분은 Passport가 자동으로 처리)
+  }
+
+  // 카카오 로그인 콜백 라우트
+  @Get('kakao/callback')
+  @UseGuards(AuthGuard('kakao')) // 'kakao' 전략을 사용
+  async kakaoAuthRedirect(@Req() req, @Res() res) {
+    try {
+      // 인증된 사용자 정보 확인
+      if (!req.user) {
+        throw new Error('No user found in request');
+      }
+
+      const { accessToken, refreshToken } = req.user;
+
+      // 쿠키 설정
+      setLoginCookie(res, accessToken, refreshToken);
+
+      const FRONTEND_URL =
+        process.env.ENV === 'production'
+          ? process.env.FRONTEND_PROD_URL
+          : process.env.FRONTEND_DEV_URL;
+      res.redirect(FRONTEND_URL);
+    } catch (error) {
+      console.error('Error in kakaoAuthRedirect: ', error.message);
+      res
+        .status(500)
+        .json({ message: 'Internal server error', error: error.message });
+    }
+  }
 }

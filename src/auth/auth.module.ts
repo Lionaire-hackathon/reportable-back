@@ -8,6 +8,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { UsersService } from 'src/users/users.service';
 import { JwtStrategy } from './strategy/jwt.strategy';
 import { GoogleStrategy } from './strategy/google.strategy';
+import { KakaoStrategy } from './strategy/kakao.strategy';
 import * as dotenv from 'dotenv';
 import { EmailService } from 'src/email/email.service';
 import { Verification } from './entity/verification.entity';
@@ -27,6 +28,7 @@ dotenv.config();
     UsersService,
     JwtStrategy,
     GoogleStrategy,
+    KakaoStrategy,
     EmailService,
   ],
   controllers: [AuthController],
