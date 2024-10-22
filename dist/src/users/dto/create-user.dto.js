@@ -35,4 +35,12 @@ __decorate([
     }),
     __metadata("design:type", String)
 ], CreateUserDto.prototype, "phone_number", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({
+        example: '1234567890',
+        description: 'The Kakao ID of the user',
+        required: false,
+    }),
+    __metadata("design:type", String)
+], CreateUserDto.prototype, "kakaoId", void 0);
 //# sourceMappingURL=create-user.dto.js.map

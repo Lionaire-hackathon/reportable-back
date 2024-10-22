@@ -14,4 +14,6 @@ export declare class AuthController {
     refreshToken(req: any, res: any): void;
     logout(res: any): Promise<void>;
     googleAuthRedirect(req: any, res: any): Promise<void>;
+    kakaoLogin(): Promise<void>;
+    kakaoAuthRedirect(req: any, res: any): Promise<void>;
 }

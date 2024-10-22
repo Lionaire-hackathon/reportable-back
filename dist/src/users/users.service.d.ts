@@ -10,6 +10,7 @@ export declare class UsersService {
     createUser(createUserDto: CreateUserDto): Promise<User>;
     findOne(email: string): Promise<User | undefined>;
     findOneById(id: number): Promise<User | undefined>;
+    findOneByKakaoId(kakaoId: string): Promise<User>;
     updateUser(id: number, updateUserDto: UpdateUserDto): Promise<User>;
     removeUser(id: number): Promise<void>;
 }

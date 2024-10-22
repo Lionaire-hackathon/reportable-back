@@ -81,6 +81,27 @@ let AuthController = class AuthController {
                 .json({ message: 'Internal server error', error: error.message });
         }
     }
+    async kakaoLogin() {
+    }
+    async kakaoAuthRedirect(req, res) {
+        try {
+            if (!req.user) {
+                throw new Error('No user found in request');
+            }
+            const { accessToken, refreshToken } = req.user;
+            (0, auth_util_1.setLoginCookie)(res, accessToken, refreshToken);
+            const FRONTEND_URL = process.env.ENV === 'production'
+                ? process.env.FRONTEND_PROD_URL
+                : process.env.FRONTEND_DEV_URL;
+            res.redirect(FRONTEND_URL);
+        }
+        catch (error) {
+            console.error('Error in kakaoAuthRedirect: ', error.message);
+            res
+                .status(500)
+                .json({ message: 'Internal server error', error: error.message });
+        }
+    }
 };
 exports.AuthController = AuthController;
 __decorate([
@@ -154,6 +175,22 @@ __decorate([
     __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", Promise)
 ], AuthController.prototype, "googleAuthRedirect", null);
+__decorate([
+    (0, common_1.Get)('kakao'),
+    (0, common_1.UseGuards)((0, passport_1.AuthGuard)('kakao')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", []),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "kakaoLogin", null);
+__decorate([
+    (0, common_1.Get)('kakao/callback'),
+    (0, common_1.UseGuards)((0, passport_1.AuthGuard)('kakao')),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Res)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], AuthController.prototype, "kakaoAuthRedirect", null);
 exports.AuthController = AuthController = __decorate([
     (0, common_1.Controller)('auth'),
     __metadata("design:paramtypes", [auth_service_1.AuthService])

@@ -34,11 +34,14 @@ let UsersService = class UsersService {
     }
     async findOne(email) {
         return this.userRepository.findOneBy({
-            email: email
+            email: email,
         });
     }
     async findOneById(id) {
         return this.userRepository.findOneBy({ id });
+    }
+    async findOneByKakaoId(kakaoId) {
+        return this.userRepository.findOneBy({ kakaoId });
     }
     async updateUser(id, updateUserDto) {
         const { name, email, password } = updateUserDto;

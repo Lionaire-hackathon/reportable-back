@@ -5,6 +5,7 @@ export declare class Identity {
     password: string;
     refreshToken?: string;
     provider: string;
+    kakaoId: string;
     is_email_verified: Boolean;
     is_phone_verified: Boolean;
     user: User;

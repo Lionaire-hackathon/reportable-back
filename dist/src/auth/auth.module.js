@@ -17,6 +17,7 @@ const jwt_1 = require("@nestjs/jwt");
 const users_service_1 = require("../users/users.service");
 const jwt_strategy_1 = require("./strategy/jwt.strategy");
 const google_strategy_1 = require("./strategy/google.strategy");
+const kakao_strategy_1 = require("./strategy/kakao.strategy");
 const dotenv = require("dotenv");
 const email_service_1 = require("../email/email.service");
 const verification_entity_1 = require("./entity/verification.entity");
@@ -37,6 +38,7 @@ exports.AuthModule = AuthModule = __decorate([
             users_service_1.UsersService,
             jwt_strategy_1.JwtStrategy,
             google_strategy_1.GoogleStrategy,
+            kakao_strategy_1.KakaoStrategy,
             email_service_1.EmailService,
         ],
         controllers: [auth_controller_1.AuthController],

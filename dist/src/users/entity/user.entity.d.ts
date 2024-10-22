@@ -10,6 +10,7 @@ export declare class User {
     name: string;
     email: string;
     phone_number: string;
+    kakaoId: string;
     role: Role;
     essayLimit: number;
     researchLimit: number;
