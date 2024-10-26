@@ -9,6 +9,8 @@ import { FileModule } from './file/file.module';
 import * as dotenv from 'dotenv';
 import { ConfigModule } from '@nestjs/config';
 import { EmailModule } from './email/email.module';
+import { PaymentsModule } from './payments/payments.module';
+
 
 dotenv.config();
 
@@ -30,6 +32,7 @@ dotenv.config();
     DocumentModule,
     FileModule,
     EmailModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

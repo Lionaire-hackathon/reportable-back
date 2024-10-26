@@ -4,6 +4,7 @@ import * as dotenv from 'dotenv';
 import { AllExceptionsFilter } from 'all-exceptions.filter';
 import { AppModule } from './app.module';
 import * as cookieParser from 'cookie-parser';
+import { ValidationPipe } from '@nestjs/common';
 
 // dotenv를 사용하여 .env 파일을 읽어옵니다.
 dotenv.config();
@@ -15,7 +16,7 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
-  app.useGlobalFilters(new AllExceptionsFilter());
+  //app.useGlobalFilters(new AllExceptionsFilter());
 
   const FRONTEND_URL = process.env.ENV === "production" ? process.env.FRONTEND_PROD_URL : process.env.FRONTEND_DEV_URL;
 
@@ -26,6 +27,8 @@ async function bootstrap() {
     credentials: true,
   });
 
+  app.useGlobalPipes(new ValidationPipe());
+
   // Swagger를 설정합니다.
   const config = new DocumentBuilder()
     .setTitle('REPORTABLE API')
@@ -34,19 +37,21 @@ async function bootstrap() {
     .addBearerAuth(
       {
         type: 'http',
-        description: '',
+        description: 'Enter JWT token',
         scheme: 'Bearer',
         bearerFormat: 'JWT',
+        in: 'Header',
+        name: 'Authorization',
       },
-      'JWT',
+      'JWT', 
     )
     .build();
 
   // 애플리케이션을 8080 포트에서 실행합니다.
-  await app.listen(8080);
-  
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api-docs', app, document);
+
+  await app.listen(8080);
 }
 
 // 애플리케이션을 실행합니다.
